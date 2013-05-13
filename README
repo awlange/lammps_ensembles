@@ -1,7 +1,8 @@
-============================= LAMMPS Ensembles ==================================
-                   Primary author:          Adrian W. Lange
-                   Contributing authors:        Luke Westby
-                                               Mladen Rasic
+============================== LAMMPS Ensembles =================================
+                               Authors: 
+                               Adrian W. Lange
+                               Luke Westby
+                               Mladen Rasic
 =================================================================================
 
 LAMMPS Ensembles (LE) is a multidimensional replica exchange interface to LAMMPS.
