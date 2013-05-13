@@ -1,0 +1,28 @@
+============================= LAMMPS Ensembles ==================================
+                   Primary author:          Adrian W. Lange
+                   Contributing authors:        Luke Westby
+                                               Mladen Rasic
+=================================================================================
+
+LAMMPS Ensembles (LE) is a multidimensional replica exchange interface to LAMMPS.
+
+LE creates multiple instances of LAMMPS classes on a set of MPI subcommunicators.
+Each subcom starts up its own LAMMPS instance and runs molecular dynamics. 
+After so many MD steps, exchanges are attempted between replicas according to
+Boltzmann statistics probability (Metropolis criteria).
+
+LE can run: 
+   o  Parallel tempering replica exchange in one dimension
+
+   o  Hamiltonian exchange in one dimension
+
+   o  Replica exchange umbrella sampling in an arbitrary number of dimensions,
+      each dimension having a different collective variable. REUS is run
+      via the colvars library that ships with LAMMPS.
+
+   o  REUS + parallel tempering in one dimension
+
+   o  REUS + Hamiltonian exchange in one dimension
+
+   o  Dimensions which are linear or circular, thereby supporting many
+      possible topologies (e.g. 3-D torus).
