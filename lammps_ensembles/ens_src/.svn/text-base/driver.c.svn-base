@@ -1,0 +1,312 @@
+/*
+ * driver.c
+ * This file is part of lammps-ensembles
+ *
+ * Copyright (C) 2012 - Mladen Rasic & Luke Westby
+ *
+ * lammps-ensembles is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * lammps-ensembles is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with lammps-ensembles; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, 
+ * Boston, MA  02110-1301  USA
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include "mpi.h"
+#include "library.h"
+#include "replica.h"
+
+int main(int argc, char **argv) {
+
+/*----------------------------------------------------------------------------------
+ * setup MPI
+ */
+
+    MPI_Init(&argc,&argv);
+    
+    int this_global_proc, n_global_procs;
+    MPI_Comm_rank(MPI_COMM_WORLD, &this_global_proc);
+    MPI_Comm_size(MPI_COMM_WORLD, &n_global_procs);
+        
+    if (this_global_proc == 0) {
+        printf("Entering main on driver.\n");
+        printf("MPI Initialized.\n\n");
+
+		// check commandline args for errors
+        if (argc <= 1) {
+            printf("FLAG ERROR\n");
+            printf("---> Syntax: $ ./bin-name P in.file.1 in.file.2 ... in.file.P\n");
+            printf("Exiting.\n\n");
+            exit(1);
+        }
+
+        if (argc != atoi(argv[1]) + 2) {
+            printf("FLAG ERROR\n");
+            printf("---> Input files do not match number of instances\n");
+            printf("---> Syntax: $ ./bin-name P in.file.1 in.file.2 ... in.file.P\n");
+            printf("Exiting.\n\n");
+            exit(1);
+        }
+        
+        printf("The number of processes is: %d\n", n_global_procs);
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+    printf("---> Report from process %d.\n", this_global_proc);
+
+/*----------------------------------------------------------------------------------
+ * split MPI_COMM_WORLD into subcomms
+ */
+
+    // set up subcomms and lammps pointers
+    MPI_Comm subcomm;
+    void *lmp;
+        
+    // grab number of communicators
+    int n_comms = atoi(argv[1]);
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	    
+    if (this_global_proc == 0)
+    		printf("\n"); 
+        printf("The number of subcomms is: %d\n\n", n_comms);
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+    // create look-up table for split_key value
+    if (this_global_proc == 0) 
+        printf("Generating table of instance IDs.\n\n");
+    
+    int gproc_lcomm[n_global_procs];
+    int i;
+    for (i = 0; i < n_global_procs; i += 1) {
+        gproc_lcomm[i] = floor((double)((i * n_comms)/(n_global_procs)));
+    }
+        
+    MPI_Barrier(MPI_COMM_WORLD);
+        
+    // split
+    if (this_global_proc == 0) 
+        printf("Splitting MPI_COMM_WORLD\n");
+    int split_key = gproc_lcomm[this_global_proc];
+    MPI_Comm_split(MPI_COMM_WORLD, split_key, 0, &subcomm);
+
+    // get local rank
+    int this_local_proc;
+    MPI_Comm_rank(subcomm, &this_local_proc);
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (this_local_proc == 0) 
+        printf("---> Report from proc 0 on subcomm %d: %d\n", gproc_lcomm[this_global_proc], this_global_proc);
+        
+/*----------------------------------------------------------------------------------
+ * locate input script filename on commandline and disable default logging and screen
+ */
+
+	// argv index
+    int my_file = gproc_lcomm[this_global_proc] + 2;
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (this_global_proc == 0) {
+    		printf("\n");
+        printf("Disabling default LAMMPS logging and screen output\n\n");
+	}
+
+	// hardcode lammps args	
+    char str1[] = "./ens_driver";
+    char str2[] = "-log";
+    char str3[] = "none";
+    char str4[] = "-screen";
+
+    // build list
+    char *arglist[5];
+    arglist[0] = str1;
+    arglist[1] = str2;
+    arglist[2] = str3;
+    arglist[3] = str4;
+    arglist[4] = str3;
+
+    // create pointer
+    char** args = arglist;
+
+/*----------------------------------------------------------------------------------
+ * open file and find TEMPER or ANNEAL initializer
+ */
+            
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (this_global_proc == 0)
+        printf("Attempting to find multi-replica simulation initializer in input script\n\n");
+
+
+    int nsteps, nevery, sseed, bseed, rate;	// total run, frequency of swap, randswap seed, metropolis seed, cooling rate
+	int temperflag = 0, annealflag = 0;		// RE or SA
+    double temp, temp_hi, temp_lo;			// RE temp, SA high and low temp
+    char fix[50], file[50];						// fix id, restart binary filename
+
+    // doing everything on root of subcomms
+    if (this_local_proc == 0) {
+        FILE *infile = fopen(argv[my_file], "r");
+
+		// buffer and file position for scanning
+		char command[9];
+		fpos_t position;
+
+		// search for TEMPER or ANNEAL line by checking first 9 chars
+		while(temperflag == 0 && annealflag == 0 && !feof(infile)) {	
+			fgetpos(infile, &position);	// store position
+			fgets(command, 9, infile);	// read in 9 chars
+			fscanf(infile, "\n");		// move to end of line
+
+			// check
+			if(strcmp(command, "#TEMPER:") == 0)
+				temperflag = 1;
+			else if(strcmp(command, "#ANNEAL:") == 0)
+				annealflag = 1;
+		}
+
+		// come back to beginning of line
+		fsetpos(infile, &position);
+
+		// scan values from line and clip commas off char *'s
+		if(temperflag) {
+			fscanf(infile, "#TEMPER: run %d, swap %d, temp %lf, fix %s, seed1 %d, seed2 %d", &nsteps, &nevery, &temp, fix, &sseed, &bseed);
+			int len = strlen(fix) - 1;
+			fix[len] = 0;
+		} else if(annealflag) {
+			fscanf(infile, "#ANNEAL: run %d, swap %d, rate %d, file %s fix %s seed %d, temp_hi %lf, temp_lo %lf\n", &nsteps, &nevery, &rate, file, fix, &bseed, &temp_hi, &temp_lo);
+			int len_fix = strlen(fix) - 1;
+			int len_file = strlen(file) -1;
+			fix[len_fix] = 0;
+			file[len_file] = 0;
+		}
+		
+        fclose(infile);
+    }
+
+	// bcast flags and common values
+	MPI_Bcast(&temperflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&annealflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	
+    MPI_Bcast(&nsteps, 1, MPI_INT, 0, subcomm);
+    MPI_Bcast(&nevery, 1, MPI_INT, 0, subcomm);
+    MPI_Bcast(&bseed, 1, MPI_INT, 0, subcomm);
+    MPI_Bcast(fix, 20, MPI_CHAR, 0, subcomm);
+
+	// print for error checking and bcast specific values
+	if(temperflag) {
+		
+	    if(this_global_proc == 0) {
+			printf("Preparing to run replica exchange:\n");
+	        printf("---> Run %d total timesteps\n", nsteps);
+	        printf("---> Attempt exchange every %d timesteps\n", nevery);
+	        printf("---> Using fix id %s\n", fix);
+	        printf("---> Using random swap seed %d\n", sseed);
+			printf("---> Using metroplis seed %d + (global rank)\n", bseed);
+		} if(this_local_proc == 0)
+			printf("---> Instance %d using temp %lf\n", split_key, temp);
+
+	    MPI_Bcast(&sseed, 1, MPI_INT, 0, subcomm);
+	    MPI_Bcast(&temp, 1, MPI_DOUBLE, 0, subcomm);
+
+	} else if(annealflag) {
+	
+	    if(this_global_proc == 0) {
+			printf("Preparing to run simulated annealing:\n");
+	        printf("---> Run %d total timesteps\n", nsteps);
+	        printf("---> Attempt exchange every %d timesteps\n", nevery);
+			printf("---> Using metroplis seed %d + (global rank)\n", bseed);
+	        printf("---> Decrease temperature every %d timesteps\n", rate);
+	        printf("---> Using fix id %s\n", fix);
+			printf("---> Starting temp: %lf\n", temp_hi);
+			printf("---> Ending temp: %lf\n", temp_lo);
+		} if(this_local_proc == 0)
+			printf("---> Instance %d using restart binary filename %s\n", split_key, file);
+
+		MPI_Bcast(file, strlen(file), MPI_INT, 0, subcomm);
+		MPI_Bcast(&rate, 1, MPI_INT, 0, subcomm);
+		MPI_Bcast(&temp_hi, 1, MPI_DOUBLE, 0, subcomm);
+		MPI_Bcast(&temp_lo, 1, MPI_DOUBLE, 0, subcomm);
+
+	} else {		// could not find TEMPER or ANNEAL line
+
+		if(this_global_proc == 0) {
+			printf("No multi-replica simulation specificied in input script.\n");
+			printf("Please specifiy a simulation.\n");
+			printf("Exiting.\n\n");
+			exit(1);
+		}
+	}
+
+/*----------------------------------------------------------------------------------
+ * open LAMMPS - assign LAMMPS pointer, read input script, run simulation
+ */
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	if(this_global_proc == 0) {
+    		printf("\n");
+		printf("Openning LAMMPS on subcomm %d.\n", split_key);
+	}
+
+	// assign lmp to new LAMMPS instance	
+    lammps_open(5, args, subcomm, &lmp);           
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (this_local_proc == 0)
+        printf("---> Openning LAMMPS script %s subcomm %d.\n", argv[my_file], split_key);        
+
+	// open input script
+    lammps_file(lmp, argv[my_file]);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+	// run simulation
+    if(temperflag) {
+    		if (this_global_proc == 0) 
+    		    printf("---> Beginning replica exchange...\n\n"); 
+
+	    temper(lmp, subcomm, nsteps, nevery, n_comms, split_key, temp, fix, sseed, bseed); 
+	}
+
+	else if(annealflag) {
+		if(this_global_proc == 0)
+			printf("---> Beggining simulated annealing...\n\n");
+
+//		anneal(lmp, subcomm, file, fix, bseed, split_key, n_comms, nsteps, nevery, rate, temp_hi, temp_lo);
+	}
+
+/*----------------------------------------------------------------------------------
+ * close LAMMPS and clean up
+ */
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (this_global_proc == 0) 
+        printf("\n"); 
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	if (this_local_proc == 0) 
+        printf("---> Closing LAMMPS on subcomm %d.\n\n", gproc_lcomm[this_global_proc]);
+
+    lammps_close(lmp);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (this_global_proc == 0) 
+        printf("Closing MPI.\n\n");
+
+    MPI_Finalize();
+
+    return 0;
+
+}

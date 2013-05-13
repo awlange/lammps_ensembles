@@ -1,0 +1,347 @@
+LAMMPS (9 Mar 2013)
+  using 1 OpenMP thread(s) per MPI task
+#COORDX: fix cv, seed 0
+#REPLICA: id 2, ndim 1, temp 275.0, tdim -1
+#DIMENSION: 0 run 500 swaps 5
+#NEIGHBORS: 0 1 3
+
+variable        replicaID   string  2
+variable        replicaTemp string  275.0
+
+# Solvated 5-mer peptide
+
+units		real
+atom_style	full
+
+pair_style	lj/charmm/coul/long 8.0 10.0
+bond_style      harmonic
+angle_style     charmm
+dihedral_style  charmm
+improper_style  harmonic
+kspace_style	pppm 0.0001
+
+read_data	data.peptide.${replicaID}
+read_data	data.peptide.2
+  3 = max bonds/atom
+  6 = max angles/atom
+  14 = max dihedrals/atom
+  1 = max impropers/atom
+  orthogonal box = (36.8402 41.0137 29.7681) to (64.2116 68.3851 57.1395)
+  1 by 1 by 1 MPI processor grid
+  2004 atoms
+  2004 velocities
+  1365 bonds
+  786 angles
+  207 dihedrals
+  12 impropers
+  4 = max # of 1-2 neighbors
+  7 = max # of 1-3 neighbors
+  14 = max # of 1-4 neighbors
+  18 = max # of special neighbors
+
+neighbor	2.0 bin
+neigh_modify	delay 5
+
+timestep	2.0
+
+group		peptide type <= 12
+84 atoms in group peptide
+
+fix		1 all nvt temp ${replicaTemp} ${replicaTemp} 100.0 tchain 1
+fix		1 all nvt temp 275.0 ${replicaTemp} 100.0 tchain 1
+fix		1 all nvt temp 275.0 275.0 100.0 tchain 1
+fix		4 all shake 0.0001 10 100 b 4 6 8 10 12 14 18 a 31
+  19 = # of size 2 clusters
+  6 = # of size 3 clusters
+  3 = # of size 4 clusters
+  640 = # of frozen angles
+
+# The colvars fix, read info from file
+fix		cv all colvars peptide.colvars.${replicaID} output out.${replicaID}
+fix		cv all colvars peptide.colvars.2 output out.${replicaID}
+fix		cv all colvars peptide.colvars.2 output out.2
+
+# Dump for viewing
+dump		1 peptide custom 2 dump.colvar.lammpstrj.${replicaID} id xu yu zu
+dump		1 peptide custom 2 dump.colvar.lammpstrj.2 id xu yu zu
+dump_modify     1 sort id
+
+thermo_style	custom step temp etotal pe ke epair ebond f_cv
+thermo		10
+
+PPPM initialization ...
+  G vector (1/distance) = 0.268725
+  grid = 15 15 15
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0228209
+  estimated relative force accuracy = 6.87243e-05
+  using single precision FFTs
+  3d grid and FFT values/proc = 10648 3375
+colvars: ----------------------------------------------------------------------
+colvars: Initializing the collective variables module, version 2013-01-23.
+colvars: # analysis = off [default]
+colvars: # colvarsTrajFrequency = 2
+colvars: # colvarsRestartFrequency = 1000
+colvars: # colvarsTrajAppend = off [default]
+colvars: The restart output state file will be "rest.colvars.state".
+colvars: The final output state file will be "out.2.colvars.state".
+colvars: The trajectory file will be "out.2.colvars.traj".
+colvars: ----------------------------------------------------------------------
+colvars:   Initializing a new collective variable.
+colvars:   # name = one
+colvars:   Initializing a new "distance" component.
+colvars:     # componentCoeff = 1 [default]
+colvars:     # componentExp = 1 [default]
+colvars:     # period = 0 [default]
+colvars:     # wrapAround = 0 [default]
+colvars:     # forceNoPBC = off [default]
+colvars:     # oneSiteSystemForce = off [default]
+colvars:       Initializing atom group "group1".
+colvars:       # atomNumbers = { 16 }
+colvars:       # psfSegID =  [default]
+colvars:       # atomsFile = "" [default]
+colvars:       # dummyAtom = ( 0 , 0 , 0 ) [default]
+colvars:       # disableForces = off [default]
+colvars:       # centerReference = off [default]
+colvars:       # rotateReference = off [default]
+colvars:       # fitGradients = off [default]
+colvars:       Atom group "group1" defined, 1 initialized: total mass = 12.011.
+colvars:       Initializing atom group "group2".
+colvars:       # atomNumbers = { 52 }
+colvars:       # psfSegID =  [default]
+colvars:       # atomsFile = "" [default]
+colvars:       # dummyAtom = ( 0 , 0 , 0 ) [default]
+colvars:       # disableForces = off [default]
+colvars:       # centerReference = off [default]
+colvars:       # rotateReference = off [default]
+colvars:       # fitGradients = off [default]
+colvars:       Atom group "group2" defined, 1 initialized: total mass = 12.011.
+colvars:   All components initialized.
+colvars:   # width = 1 [default]
+colvars:   # lowerBoundary = 0 [default]
+colvars:   # lowerWallConstant = 0 [default]
+colvars:   # upperBoundary = 0 [default]
+colvars:   # upperWallConstant = 0 [default]
+colvars:   # expandBoundaries = off [default]
+colvars:   # extendedLagrangian = off [default]
+colvars:   # outputValue = on [default]
+colvars:   # outputVelocity = off [default]
+colvars:   # outputSystemForce = off [default]
+colvars:   # outputAppliedForce = off [default]
+colvars: ----------------------------------------------------------------------
+colvars: Collective variables initialized, 1 in total.
+colvars: ----------------------------------------------------------------------
+colvars:   Initializing a new "harmonic" instance.
+colvars:   # name = h_pot
+colvars:   # colvars = { one }
+colvars:   # forceConstant = 80
+colvars:   # centers = { 15.2 }
+colvars:   # targetCenters = { 15.2 } [default]
+colvars:   # targetForceConstant = 0 [default]
+colvars: ----------------------------------------------------------------------
+colvars: Collective variables biases initialized, 1 in total.
+colvars: ----------------------------------------------------------------------
+colvars: Collective variables module initialized.
+colvars: ----------------------------------------------------------------------
+SHAKE stats (type/ave/delta) on step 0
+  4 1.111 1.44264e-05
+  6 0.996998 7.26967e-06
+  8 1.08 1.32536e-05
+  10 1.111 1.22749e-05
+  12 1.08 1.11767e-05
+  14 0.96 0
+  18 0.957206 4.37979e-05
+  31 104.519 0.00396029
+Memory usage per processor = 23.0261 Mbytes
+Step Temp TotEng PotEng KinEng E_pair E_bond cv 
+       0    282.10052    -5237.458   -6372.3766    1134.9186    -6442.768    16.557152      54.9091 
+      10    284.78189   -5196.2906   -6341.9966     1145.706   -6423.2762    16.576434    12.518999 
+      20    283.98492   -5186.7643    -6329.264    1142.4997    -6434.181     22.05751 0.0069360087 
+      30    286.06366   -5194.0473     -6344.91    1150.8627   -6440.6939     18.20946    1.0625559 
+      40    279.79264   -5202.9647   -6328.5985    1125.6338   -6416.6188    10.045673   0.28920574 
+      50    286.34034   -5214.6767   -6366.6525    1151.9758   -6451.1889    18.265075   0.17343292 
+      60    270.55959   -5227.4074   -6315.8957    1088.4883   -6409.7542    20.923961  0.079243499 
+      70    267.76334   -5243.9028   -6321.1414    1077.2387   -6414.7137    22.479542    3.6571958 
+      80    274.36147   -5252.8927   -6356.6764    1103.7836   -6445.5183    19.449596   0.99947377 
+      90    280.37562   -5265.3398    -6393.319    1127.9791   -6480.5231    23.501476   0.77273477 
+SHAKE stats (type/ave/delta) on step 100
+  4 1.111 2.30004e-06
+  6 0.996999 2.93201e-06
+  8 1.08 2.66227e-06
+  10 1.111 1.7335e-06
+  12 1.08019 0.0014021
+  14 0.959999 0
+  18 0.9572 1.09214e-05
+  31 104.52 0.000833268
+     100    265.19014    -5279.249   -6346.1354    1066.8864   -6429.2608    13.071356   0.74157637 
+SHAKE stats (type/ave/delta) on step 100
+  4 1.111 2.52013e-06
+  6 0.996999 3.07132e-06
+  8 1.08 2.94611e-06
+  10 1.111 1.8978e-06
+  12 1.08019 0.00142898
+  14 0.959999 0
+  18 0.9572 1.17229e-05
+  31 104.52 0.000888208
+WARNING: Inconsistent image flags (domain.cpp:594)
+SHAKE stats (type/ave/delta) on step 100
+  4 1.111 2.30004e-06
+  6 0.996999 2.93201e-06
+  8 1.08 2.66227e-06
+  10 1.111 1.7335e-06
+  12 1.08019 0.0014021
+  14 0.959999 0
+  18 0.9572 1.09214e-05
+  31 104.52 0.000833268
+     110    274.03584   -5292.9235   -6395.3971    1102.4736   -6484.8009    21.279328   0.48918574 
+     120    276.01106   -5305.8015   -6416.2216    1110.4201   -6503.2087    17.058757    0.3462939 
+     130      265.696   -5318.4054   -6387.3269    1068.9216   -6471.2253    18.559919   0.12622256 
+     140    267.99414   -5331.0465   -6409.2137    1078.1672   -6485.8983    21.894464    2.0072117 
+     150    277.88088    -5339.362   -6457.3046    1117.9426   -6534.2208    20.792671   0.86330577 
+     160    272.04594   -5346.7618   -6441.2298     1094.468   -6524.3619    22.022867   0.11321886 
+     170    268.14461   -5352.8468   -6431.6194    1078.7726   -6516.7385    19.691439    0.3663501 
+     180    270.45021   -5357.9213   -6445.9696    1088.0482     -6523.36    15.316106     1.008486 
+     190    264.71133    -5359.619   -6424.5792    1064.9601   -6520.3326     22.43888   0.52175225 
+SHAKE stats (type/ave/delta) on step 200
+  4 1.111 1.51686e-07
+  6 0.997 8.51642e-08
+  8 1.08 4.64666e-07
+  10 1.111 1.14437e-06
+  12 1.07992 0.000623353
+  14 0.96 0
+  18 0.957201 3.12057e-06
+  31 104.52 0.000390463
+     200    269.65206   -5360.2239   -6445.0611    1084.8372   -6527.8975    23.470139   0.18588023 
+WARNING: Inconsistent image flags (domain.cpp:594)
+SHAKE stats (type/ave/delta) on step 200
+  4 1.111 2.30358e-07
+  6 0.997 1.10417e-07
+  8 1.08 3.39737e-07
+  10 1.111 1.21618e-06
+  12 1.07992 0.000613349
+  14 0.96 0
+  18 0.957201 3.22347e-06
+  31 104.52 0.000374367
+WARNING: Inconsistent image flags (domain.cpp:594)
+SHAKE stats (type/ave/delta) on step 200
+  4 1.111 1.51686e-07
+  6 0.997 8.51642e-08
+  8 1.08 4.64666e-07
+  10 1.111 1.14437e-06
+  12 1.07992 0.000623353
+  14 0.96 0
+  18 0.957201 3.12057e-06
+  31 104.52 0.000390463
+     210    266.07731   -5357.9416   -6428.3972    1070.4556   -6512.3214    15.328709   0.25163601 
+     220    267.04999   -5351.4698   -6425.8386    1074.3688   -6509.1555     20.03028 0.0039568248 
+     230    265.42895   -5344.3823   -6412.2295    1067.8472   -6496.0528    18.427791    1.1647099 
+     240    264.16708   -5332.7841   -6395.5547    1062.7706   -6487.0996    23.812808   0.18866912 
+     250     266.9968    -5318.829   -6392.9838    1074.1548   -6473.8946    19.088799   0.18003068 
+     260    278.97122   -5303.6564   -6425.9855    1122.3291   -6513.2744    17.425262   0.77165753 
+     270    278.37129   -5288.3779   -6408.2934    1119.9155   -6494.6351    21.209221    0.4155694 
+     280    281.51134   -5273.4688    -6406.017    1132.5483   -6490.0364    17.477185  0.012265919 
+     290    290.77213   -5262.7349   -6432.5402    1169.8053   -6525.6111    14.047888     1.480027 
+SHAKE stats (type/ave/delta) on step 300
+  4 1.111 1.88493e-06
+  6 0.997001 1.24893e-06
+  8 1.08 2.02762e-06
+  10 1.111 3.8747e-06
+  12 1.08023 0.00139268
+  14 0.96 0
+  18 0.957201 4.5969e-06
+  31 104.52 0.000709899
+     300    281.14713   -5254.0447   -6385.1277     1131.083    -6477.026    16.304927   0.89636846 
+WARNING: Inconsistent image flags (domain.cpp:594)
+SHAKE stats (type/ave/delta) on step 300
+  4 1.111 3.13461e-06
+  6 0.997001 1.4521e-06
+  8 1.08 2.93578e-06
+  10 1.111 4.86519e-06
+  12 1.08008 0.000505431
+  14 0.96 0
+  18 0.957202 7.93428e-06
+  31 104.52 0.000834744
+     310      291.843   -5228.4013   -6402.5149    1174.1136   -6479.5012    15.496989   0.67868885 
+     320    280.80861   -5227.3575   -6357.0786    1129.7211   -6428.6014    13.780214   0.90176349 
+     330    286.35597   -5226.9274   -6378.9661    1152.0387   -6464.5925    27.108165   0.14108362 
+     340    276.89592   -5229.3475   -6343.3275      1113.98   -6427.1183    17.584647  0.002390547 
+     350    285.12958   -5232.8427   -6379.9475    1147.1048   -6467.0242    19.105478   0.12907354 
+     360    274.59389   -5236.9788   -6341.6975    1104.7187   -6435.3778    21.574935   0.23822195 
+     370    278.98495   -5242.4617    -6364.846    1122.3843   -6460.4993    18.727466    1.1484052 
+     380    281.48685   -5249.1412   -6381.5909    1132.4497   -6466.3727    16.921316    1.2107961 
+     390    283.21728   -5256.5838   -6395.9953    1139.4114   -6479.6423    29.645462   0.19930757 
+SHAKE stats (type/ave/delta) on step 400
+  4 1.111 1.99893e-06
+  6 0.996999 9.73764e-07
+  8 1.08 2.08209e-06
+  10 1.111 2.73581e-06
+  12 1.0799 0.000846593
+  14 0.959998 0
+  18 0.9572 8.546e-06
+  31 104.52 0.00070084
+     400    274.99918   -5266.7082   -6373.0574    1106.3492   -6457.8855    21.089763   0.47353935 
+WARNING: Inconsistent image flags (domain.cpp:594)
+SHAKE stats (type/ave/delta) on step 400
+  4 1.111 1.2541e-06
+  6 0.997 5.17473e-07
+  8 1.08 5.86807e-07
+  10 1.111 1.48206e-06
+  12 1.07999 0.000107832
+  14 0.96 0
+  18 0.957201 5.81248e-06
+  31 104.52 0.000598207
+     410    268.83508    -5310.927   -6392.4774    1081.5504   -6472.9035    23.375454    1.9184652 
+     420    268.36313   -5318.5963    -6398.248    1079.6517   -6475.8639    13.742696   0.85218749 
+     430    263.15041   -5323.8685    -6382.549    1058.6804   -6462.4317    15.897643   0.21519744 
+     440    268.43717   -5328.4452   -6408.3948    1079.9496   -6480.3866    14.317872    1.5582524 
+     450    271.36306   -5329.2736   -6420.9944    1091.7207   -6495.8434    16.006795   0.82409661 
+     460    266.69056   -5329.5645   -6402.4872    1072.9228   -6476.5062    16.273934    1.4007616 
+     470    267.69619   -5326.2423   -6403.2109    1076.9685   -6485.6518    25.363085   0.54949637 
+     480    264.78378   -5321.8199   -6387.0715    1065.2516   -6464.7743    18.968218   0.59375545 
+     490    271.64328   -5314.1188   -6406.9669    1092.8481   -6478.4756    13.906875   0.05033124 
+SHAKE stats (type/ave/delta) on step 500
+  4 1.111 3.41596e-06
+  6 0.997001 1.4478e-06
+  8 1.08 9.51306e-07
+  10 1.111 2.70867e-06
+  12 1.07983 0.000982404
+  14 0.960003 0
+  18 0.957202 6.71286e-06
+  31 104.52 0.000608473
+     500    270.63913   -5305.3537   -6394.1619    1088.8083   -6463.0767    12.575239   0.39254928 
+WARNING: Inconsistent image flags (domain.cpp:594)
+SHAKE stats (type/ave/delta) on step 500
+  4 1.111 6.09682e-07
+  6 0.997 2.56592e-07
+  8 1.08 3.17438e-07
+  10 1.111 3.6731e-07
+  12 1.07991 0.000614321
+  14 0.959999 0
+  18 0.957201 5.06789e-06
+  31 104.52 0.000440041
+colvars: Saving collective variables state to "out.2.colvars.state".
+Loop time of 0 on 1 procs (1 MPI x 1 OpenMP) for 500 steps with 2004 atoms
+
+Pair  time (%) = 16.8493 (1684.93)
+Bond  time (%) = 0.0401917 (4.01917)
+Kspce time (%) = 2.64332 (264.332)
+Neigh time (%) = 1.92049 (192.049)
+Comm  time (%) = 0.105272 (10.5272)
+Outpt time (%) = 0.050684 (5.0684)
+Other time (%) = -21.6092 (-2160.92)
+
+FFT time (% of Kspce) = 0.812355 (30.7324)
+FFT Gflps 3d (1d only) = 0.337525 0.412392
+
+Nlocal:    2004 ave 2004 max 2004 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:    11225 ave 11225 max 11225 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:    707773 ave 707773 max 707773 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 707773
+Ave neighs/atom = 353.18
+Ave special neighs/atom = 2.34032
+Neighbor list builds = 0
+Dangerous builds = 0

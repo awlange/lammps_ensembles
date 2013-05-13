@@ -1,0 +1,32 @@
+This example illustrates how to perform a 1 dimensionsal Hamiltonian exchange
+calculation. The Hamiltonian differs only by the definitions in the
+parameter files.  
+
+o  There are 4 replicas, each with the same temperature (must be the same!). 
+
+o  There is a separate input for each replica, files in.peptide.*
+   Each input contains the COORDX, REPLICA, DIMENSION, and NEIGHBORS
+   headers to define the run settings.
+
+o  The inputs all contain the MANDATORY line "compute pe all pe". 
+
+o  The file ens_input.dat contains a listing of the replica indexes,
+   the input files for each replica, and how many MPI ranks to use. 
+
+o  The data.peptide.* files define the force field types, etc. and
+   the starting geometry. All replicas begin with the same geometry
+   in this example (because I am lazy).
+
+o  The data.peptide.* parameters are the same in each replica
+   EXCEPT for the Pair Coeffs index 1. I just subtracted 0.01
+   successivley. The set up is:
+   Replica 0: 0.110000
+   Replica 1: 0.100000
+   Replica 2: 0.090000
+   Replica 3: 0.080000
+
+o  To run this example, use the following (noting that you may need
+   to specify the full path of ens_driver depending on your $path):
+   
+   mpiexec -np 4 ens_driver 4 -log -readinput ens_input.dat
+   

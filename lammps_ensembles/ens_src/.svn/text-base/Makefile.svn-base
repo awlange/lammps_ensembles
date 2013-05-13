@@ -1,0 +1,35 @@
+#----------------------------------------------------
+
+# User-defined values
+
+# Compiler executable
+CC = mpicc
+
+# LAMMPS src directory
+LAMMPSDIR = $(HOME)/lammps-ensembles/lammps-june2012/src
+
+# External library paths and identifiers
+LIBDIR = -L/soft/apps/libraries/alcf/current/gnu/FFTW3/lib
+LIB = -llmp_bgp -lfftw3
+
+#----------------------------------------------------
+
+CCFLAGS = -O3 -I$(LAMMPSDIR)
+
+install: driver.o temper.o anneal.o rng.o
+	$(CC) $(LIBDIR) -L$(LAMMPSDIR) driver.o temper.o rng.o $(LIB) -lstdc++ -lm -o ../ens_driver
+
+driver.o: driver.c
+	$(CC) $(CCFLAGS) -c driver.c -o driver.o
+
+temper.o: temper.c
+	$(CC) $(CCFLAGS) -c temper.c -o temper.o
+
+anneal.o: anneal.c
+	$(CC) $(CCFLAGS) -c anneal.c -o anneal.o
+
+rng.o: rng.c
+	$(CC) $(CCFLAGS) -c rng.c -o rng.o
+
+clean:
+	rm -f driver.o temper.o rng.o anneal.o ../ens_driver
