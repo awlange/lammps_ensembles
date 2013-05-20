@@ -72,10 +72,22 @@ void ReadReplica(Replica *this_replica, MPI_Comm subcomm, int split_key, int thi
               tmp.dim_num    = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
             }
             else if ( sscanf(line, "#DIMENSION: %d num %d run %d swaps %d", &dim, &num, &run, &swap) == 4 ) {
-              // DIMENSION line
+              // DIMENSION line using number of swaps
               tmp.dim_run[dim] = run;
               tmp.dim_nevery[dim] = run / swap;
               tmp.dim_num[dim] = num;
+            }
+            else if ( sscanf(line, "#DIMENSION: %d num %d run %d swapfreq %d", &dim, &num, &run, &swap) == 4 ) {
+              // DIMENSION line using swap frequency
+              tmp.dim_run[dim] = run;
+              tmp.dim_nevery[dim] = swap;
+              tmp.dim_num[dim] = num;
+              // check that swap divides run
+              if (run % swap) {
+                printf("Error with swap frequency. Does not divide run. %d %% %d = %d\n", run, swap, run % swap);
+                fprintf(stderr, "Error with swap frequency. Does not divide run. %d %% %d = %d\n", run, swap, run % swap);
+                exit(1);
+              }
             }
             else if ( sscanf(line, "#NEIGHBORS: %d %d %d", &dim, &min_neigh, &plus_neigh) == 3 ) {
               tmp.neighbors[2*dim  ] = min_neigh;  
