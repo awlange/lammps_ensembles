@@ -42,3 +42,5 @@ fix		cv all colvars peptide.colvars.${replicaID} output out.${replicaID}
 thermo_style	custom step temp etotal pe ke epair ebond f_cv
 thermo		10
 
+# Mandatory line for swapping!
+compute pe all pe

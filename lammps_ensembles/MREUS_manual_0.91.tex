@@ -21,7 +21,7 @@
 
 The purpose of this work is to document how to use the Multidimensional Replica Exchange Umbrella
 Sampling (REUS) part of the LAMMPS Ensemble (LE) interface. LE now also supports
-one dimensional Hamiltonian exchanges. The LE driver
+arbitrary dimensional Hamiltonian exchanges without collective variable constraints. The LE driver
 is an external executable program that links to a library build of LAMMPS with the 
 USER-COLVARS package installed. We will assume the user has some familiarity with
 compiling and running LAMMPS already. 
@@ -190,7 +190,17 @@ with the colvars library, we can now modify it to run with LE.
 
 First and very importantly, comment out
 or delete the \texttt{run \#} command in the LAMMPS input script. If this is not done,
-the LE driver will not work properly. Secondly, there are a number of LE tags to place
+the LE driver will not work properly. 
+
+Secondly, there is a {\em mandatory} line in the input script for Hamiltonian exchange to work properly.
+The line is (put it at the bottom of your LAMMPS input script):
+\begin{verbatim}
+	compute pe all pe
+\end{verbatim}
+It simply adds a compute call for the potential energy to LAMMPS with the identification string ``pe". LE looks
+for this compute in order to get the potential energy after swapping coordinates. Without it, LE will crash.
+
+Thirdly, there are a number of LE tags to place
 at the top of the input file (not required to be at the top, but it is a good place for it). 
 There are 4 relative tag types, discussed in turn below. The syntax is somewhat strict,
 so follow as closely as possible and {\em do not} add extra spaces.
@@ -206,9 +216,11 @@ The syntax is as follows:
 The variables in the square brackets are described here:
 \begin{itemize}
 \item	\texttt{[F]} = A string corresponding to the ID name of the colvar fix
-		in this LAMMPS input script.
+		in this LAMMPS input script. If \texttt{[F]} = ``none", then the driver does
+		not search for the colvar fix. This is used for unconstrained Hamiltonian exchange
+		or parallel tempering without colvars.
 \item	\texttt{[N]} = An integer. Seeds the random number generator for the Metropolis
-		acceptance critera.
+		acceptance criteria.
 		If $\texttt{[N]} = 0$,
 		then the direction of swapping alternates as up/down. Otherwise, the direction of swaps
 		is random. This is meant to be used for debugging purposes.
@@ -218,7 +230,7 @@ The variables in the square brackets are described here:
 After the COORDX tag, LE will search for the REPLICA tag to gather information specific
 to the given replica. It's syntax is:
 \begin{verbatim}
-#REPLICA: id [I], ndim [Ndim], temp [T], tdim [TD], sdim [SD]
+#REPLICA: id [I], ndim [Ndim], temp [T], tdim [TD]
 \end{verbatim}
 The variables in the square brackets are described here:
 \begin{itemize}
@@ -235,10 +247,6 @@ The variables in the square brackets are described here:
 		parallel tempering (i.e., temperature exchanges). This is optional, and it can only be
 		for one dimension. If you don't want any parallel tempering, set this variable to -1,
 		which informs LE to ignore it.
-\item   \texttt{[SD]} = An integer. This is the index of the dimension on which to perform
-        Hamiltonian exchanges, also called the ``scaling dimension", since it is intended
-        for use as. If you don't want any scaling dimension, set this to -1. Or, you
-        can just omit this part altogether, ending the line at \texttt{tdim [TD]}.
 \end{itemize}
 
 \textbf{The DIMENSION tag.}
@@ -293,7 +301,7 @@ The variables in the square brackets are described here:
 \end{itemize}
 
 It is possible to define circular dimensions by making appropriate NEIGHBOR tags. For
-instance, for a set of three replicas (0, 1, 2, 3), we might have the following NEIGHBOR tags
+example, for a set of three replicas (0, 1, 2, 3), we might have the following NEIGHBOR tags
 in each appropriate LAMMPS input script:
 \begin{verbatim}
 #NEIGHBORS: 0 3 1
@@ -301,7 +309,7 @@ in each appropriate LAMMPS input script:
 #NEIGHBORS: 0 1 3
 #NEIGHBORS: 0 2 0
 \end{verbatim}
-In order from replica 0 to replica 2, the above would create a circular dimension for four
+In order from replica 0 to replica 3, the above would create a circular dimension for four
 replicas.
 
 
@@ -310,7 +318,7 @@ Below is a possible example of the LE header for a LAMMPS input script for a one
 parallel tempering run with the same collective variable in each temperature:
 \begin{verbatim}
 #COORDX: fix cv, seed 0
-#REPLICA: id 2, ndim 1, temp 275.0, tdim 0, sdim -1
+#REPLICA: id 2, ndim 1, temp 275.0, tdim 0
 #DIMENSION: 0 num 2 run 500 swaps 5
 #NEIGHBORS: 0 1 3
 \end{verbatim}

@@ -38,6 +38,7 @@
 double get_bias(void *lmp, char* fix, int flag_skip) 
 {
   if (flag_skip) return 0.0; // optional skip
+  else if ( strcmp(fix, "none") == 0 ) return 0.0; // also skip if fix is none
 
   double *bias_ptr = (double *)lammps_extract_fix(lmp, fix, 0, 0, 0, 0);
   double bias = *bias_ptr;
@@ -96,7 +97,6 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     double i_temp      = this_replica->temperature;   // initial temperature for this proc
     int i_ndimensions  = this_replica->N_dimensions;  // number of dimensions
     int i_temp_dim     = this_replica->temp_dim;      // which dimension, if any, is the temperature swapping dimension 
-    int i_scale_dim    = this_replica->scale_dim;     // which dimension, if any, is the scaling swapping dimension 
     int i_nsteps = 0;                                 // total number of steps to run
     int i_nswaps = 0;                                 // total number of swaps for entire run
     int i_nevery = 0;                                 // frequency of swap, will depend on dimension
@@ -282,9 +282,9 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 
         /*-------------------------------------------------------------------------*/
         // 2. extract potential energy from compute instance, and get my bias energy
-        pe_ptr = (double *)lammps_extract_compute(lmp, "thermo_pe", 0, 0);
-        pe     = *pe_ptr;
-        bias   = (i_scale_dim == idim) ? get_bias(lmp, fix, 1) : get_bias(lmp, fix, 0);
+        pe_ptr  = (double *)lammps_extract_compute(lmp, "thermo_pe", 0, 0);
+        pe      = *pe_ptr;
+        bias    = get_bias(lmp, fix, 0);
         pe_bias = pe + bias;
 
         /*-------------------------------------------------------------------------*/
@@ -373,10 +373,10 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
             }
           } 
         }
-        else if (idim == i_scale_dim) {
-          // *** Hamiltonian scaling swapping dimensions *** //
+        else {
+          // *** Hamiltonian swapping dimensions *** //
           if (partner_proc != -1) {
-            // Get my coordinates and velcoities 
+            // Get my coordinates and velocities 
             lammps_gather_atoms(lmp, "x", 1, 3, my_coords);
             lammps_gather_atoms(lmp, "v", 1, 3, my_velocs);
             if (this_local_proc == 0) {
@@ -392,72 +392,17 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
             lammps_scatter_atoms(lmp, "x", 1, 3, partner_coords);
             lammps_scatter_atoms(lmp, "v", 1, 3, partner_velocs);
             lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
-            
-            // Compute PE with my partner's coordinates
+
+            // * Compute PE with my partner's coordinates * //
             // Currently, this line REQUIRES that the input script contains the line "compute pe all pe"
+            // While this is not a necessary step for CV swaps, it is here for generality in order to allow
+            // the user to do Hamiltonian exchange without colvars. 
             pe_ptr  = (double *)lammps_extract_compute(lmp, "pe", 0, 0);
             pe_swap = *pe_ptr;
-
-            if (this_local_proc == 0) {
-                n_swaps_attempted = 1;
-                if (this_global_proc > partner_proc) {
-                  // higher proc sends pe_swap to lower proc
-                  MPI_Send(&pe,      1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD);
-                  MPI_Send(&pe_swap, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD);
-                } else {
-                  // lower proc recieves
-                  MPI_Recv(&pe_partner,      1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-                  MPI_Recv(&pe_partner_swap, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-                }
-                // lower proc does calculations
-                if (this_global_proc < partner_proc) {
-                    delta  = (pe_swap + pe_partner_swap) - (pe + pe_partner);
-                    delta /= boltz * world2temp[i_comm];
-                    double my_rand = rng2();
-                    // make decision monte carlo style
-                    if (delta <= 0.0) swap = 1; // criterion of e^0 or greater -> probability of 1
-                    else if (my_rand < exp(-delta)) swap = 1; 
-#ifdef COORDX_DEBUG
-                    double prob = exp(-delta);
-                    if (delta <= 0.0) prob = 1.0;
-                    printf("Scale Swap %d : %d<-->%d pe: %lf p_pe: %lf pe_swap: %lf p_pe_swap: %lf delta: %lf, probability: %f, rand: %lf swap: %d\n", 
-                            iswap, i_comm, partner_comm, pe, pe_partner, pe_swap, pe_partner_swap, 
-                            delta, prob, my_rand, swap);
-#endif
-                }
-                // send decision to higher proc
-                if (this_global_proc < partner_proc) {
-                    MPI_Send(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD);
-                } else {
-                    MPI_Recv(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD, &status);
-                }
-            }
-          } 
-
-        }
-        else {
-          // *** Hamiltonian bias swapping dimensions *** //
-          if (partner_proc != -1) {
-            // Get my coordinates and velcoities 
-            lammps_gather_atoms(lmp, "x", 1, 3, my_coords);
-            lammps_gather_atoms(lmp, "v", 1, 3, my_velocs);
-            if (this_local_proc == 0) {
-              // Send my coordinates to my partner, recieve coordinates from my partner
-              MPI_Sendrecv(my_coords,      3*natoms, MPI_DOUBLE, partner_proc, 0,
-                           partner_coords, 3*natoms, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-              MPI_Sendrecv(my_velocs,      3*natoms, MPI_DOUBLE, partner_proc, 0,
-                           partner_velocs, 3*natoms, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-            }
-            MPI_Bcast(partner_coords, 3*natoms, MPI_DOUBLE, 0, subcomm);
-            MPI_Bcast(partner_velocs, 3*natoms, MPI_DOUBLE, 0, subcomm);
-            // Set coordinates temporarily for energy computation
-            lammps_scatter_atoms(lmp, "x", 1, 3, partner_coords);
-            lammps_scatter_atoms(lmp, "v", 1, 3, partner_velocs);
-            lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
             
-            // Compute bias with my partner's coordinates
+            // Compute my bias with partner's coordinates (note: this is skipped if fix="none")
             bias_swap    = get_bias(lmp, fix, 0);
-            pe_bias_swap = pe + bias_swap;
+            pe_bias_swap = pe_swap + bias_swap;
 #ifdef COORDX_DEBUG_LEVEL_TWO
             printf("subcomm %d : bias %f bias_swap %f\n", i_comm, bias, bias_swap);
 #endif
@@ -532,9 +477,7 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
           lammps_scatter_atoms(lmp, "v", 1, 3, my_velocs);
           // Recompute energy/force with my coordinates
           lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
-          if (idim != i_scale_dim) { 
-            get_bias(lmp, fix, 0);
-          }
+          get_bias(lmp, fix, 0);
         }
         // swap stats
         if (this_local_proc == 0) {

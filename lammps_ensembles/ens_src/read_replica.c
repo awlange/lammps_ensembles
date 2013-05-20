@@ -32,7 +32,7 @@ void ReadReplica(Replica *this_replica, MPI_Comm subcomm, int split_key, int thi
 {
       // File syntax:
       // () = Mandatory, [] = optional
-      // #REPLICA: (id) (N_dimensions) (temperature) (temp_dim) (scale_dim) 
+      // #REPLICA: (id) (N_dimensions) (temperature) (temp_dim) 
       // #NEIGHBORS: (index of dimension) (minus neighbor) (plus neighbor) 
       
       // Only local rank master reads file 
@@ -60,26 +60,11 @@ void ReadReplica(Replica *this_replica, MPI_Comm subcomm, int split_key, int thi
         while ( !feof(fp) ) {
           if ( fgets(line, MAX_LENGTH, fp) != NULL) {
             int run, swap;
-            if ( sscanf(line, "#REPLICA: id %d, ndim %d, temp %lf, tdim %d, sdim %d", 
-                        &tmp.id, 
-                        &tmp.N_dimensions, 
-                        &tmp.temperature, 
-                        &tmp.temp_dim,
-                        &tmp.scale_dim) == 5 ) {
-              // REPLICA line with scale dimension
-              // Allocate memory 
-              tmp.neighbors  = (int*)malloc( sizeof(int) * tmp.N_dimensions * 2 ); // 2 neighbors in each dimension
-              tmp.dim_run    = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
-              tmp.dim_nevery = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
-              tmp.dim_num    = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
-            }
-            else if ( sscanf(line, "#REPLICA: id %d, ndim %d, temp %lf, tdim %d", 
+            if ( sscanf(line, "#REPLICA: id %d, ndim %d, temp %lf, tdim %d", 
                         &tmp.id, 
                         &tmp.N_dimensions, 
                         &tmp.temperature, 
                         &tmp.temp_dim) == 4 ) {
-              // REPLICA line with no scale dimension
-              tmp.scale_dim = -1;
               // Allocate memory 
               tmp.neighbors  = (int*)malloc( sizeof(int) * tmp.N_dimensions * 2 ); // 2 neighbors in each dimension
               tmp.dim_run    = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
@@ -114,14 +99,12 @@ void ReadReplica(Replica *this_replica, MPI_Comm subcomm, int split_key, int thi
       MPI_Bcast(&tmp.N_dimensions, 1, MPI_INT,    0, subcomm);
       MPI_Bcast(&tmp.temperature,  1, MPI_DOUBLE, 0, subcomm);
       MPI_Bcast(&tmp.temp_dim,     1, MPI_INT,    0, subcomm);
-      MPI_Bcast(&tmp.scale_dim,    1, MPI_INT,    0, subcomm);
 
       // Copy over from tmp 
       this_replica->id           = tmp.id;
       this_replica->N_dimensions = tmp.N_dimensions;
       this_replica->temperature  = tmp.temperature;
       this_replica->temp_dim     = tmp.temp_dim;
-      this_replica->scale_dim    = tmp.scale_dim;
       this_replica->neighbors    = (int*)malloc( sizeof(int) * tmp.N_dimensions * 2 ); // 2 neighbors in each dimension
       this_replica->dim_run      = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
       this_replica->dim_nevery   = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 

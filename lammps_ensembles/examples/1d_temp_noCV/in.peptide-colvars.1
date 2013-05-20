@@ -1,10 +1,10 @@
 #COORDX: fix none, seed 0
-#REPLICA: id 0, ndim 1, temp 300.0, tdim -1
-#DIMENSION: 0 num 0 run 500 swaps 5
-#NEIGHBORS: 0 -1 1
+#REPLICA: id 1, ndim 1, temp 285.0, tdim 0
+#DIMENSION: 0 num 1 run 500 swaps 5
+#NEIGHBORS: 0 0 2
 
-variable        replicaID   string  0
-variable        replicaTemp string  300.0
+variable        replicaID   string  1
+variable        replicaTemp string  285.0
 
 # Solvated 5-mer peptide
 
@@ -31,11 +31,9 @@ fix		1 all nvt temp ${replicaTemp} ${replicaTemp} 100.0 tchain 1
 fix		4 all shake 0.0001 10 100 b 4 6 8 10 12 14 18 a 31
 
 # Dump for viewing
-dump		1 peptide custom 2 dump.scale.lammpstrj.${replicaID} id xu yu zu
+dump		1 peptide custom 2 dump.colvar.lammpstrj.${replicaID} id xu yu zu
 dump_modify     1 sort id
 
 thermo_style	custom step temp etotal pe ke epair ebond
 thermo		10
 
-# Mandatory line for swapping!
-compute pe all pe
