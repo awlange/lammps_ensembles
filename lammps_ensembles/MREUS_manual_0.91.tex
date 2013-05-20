@@ -251,9 +251,15 @@ The variables in the square brackets are described here:
 
 \textbf{The DIMENSION tag.}
 The next tag(s) to create describe how each exchange dimension should be set up. This
-is controlled via the DIMENSION tag:
+is controlled via the DIMENSION tag. There are two options for this tag, depending on
+how you want to specify the number of swap attempts.\\
+\textbf{Option 1:}
 \begin{verbatim}
 #DIMENSION: [D] num [NUM] run [RUN] swaps [SWAPS]
+\end{verbatim}
+\textbf{Option 2:}
+\begin{verbatim}
+#DIMENSION: [D] num [NUM] run [RUN] swapfreq [SWAPFREQ]
 \end{verbatim}
 You can have an arbitrary number of DIMENSION tags, each on their own line, as
 long as that number corresponds to [Ndim] for the REPLICA tag. 
@@ -270,7 +276,10 @@ The variables in the square brackets are described here:
 		this dimension.
 \item	\texttt{[SWAPS]} = A positive integer. How many replica exchanges to attempt along this
 		dimension throughout the simulation.
+\item 	\texttt{[SWAPFREQ]} = A positive integer. The frequency of swap attempts. How many MD steps
+		are to be taken between swap attempts. This number must divide \texttt{[RUN]} ({\em i.e.} no remainder).
 \end{itemize}
+
 
 The DIMENSION tags must be consistent across all LAMMPS inputs for each replica. Otherwise,
 the run will fail.
