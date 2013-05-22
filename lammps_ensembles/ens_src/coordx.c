@@ -278,6 +278,11 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
         /*-------------------------------------------------------------------------*/
         // 1. run for one period of timesteps for this dimension
         lammps_mod_inst(lmp, 2, "thermo_pe", "addstep", &i_nevery);
+#ifdef COORDX_DEBUG
+        if (this_local_proc == 0) {
+          printf("Subcomm %d: entering MD run for %d steps.\n", i_comm, i_nevery);
+        } 
+#endif
         lammps_mod_inst(lmp, 3, NULL, "run", &i_nevery);
 
         /*-------------------------------------------------------------------------*/
