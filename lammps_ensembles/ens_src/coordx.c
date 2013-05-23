@@ -205,6 +205,9 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     double *partner_coords = (double *)malloc(sizeof(double) * 3*natoms); 
     double *my_velocs      = (double *)malloc(sizeof(double) * 3*natoms); 
     double *partner_velocs = (double *)malloc(sizeof(double) * 3*natoms); 
+    // images
+    double *my_images      = (double *)malloc(sizeof(tagint) * natoms); 
+    double *partner_images = (double *)malloc(sizeof(tagint) * natoms); 
 
 /*----------------------------------------------------------------------------------
  * Swap statistics 
@@ -384,18 +387,23 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
             // Get my coordinates and velocities 
             lammps_gather_atoms(lmp, "x", 1, 3, my_coords);
             lammps_gather_atoms(lmp, "v", 1, 3, my_velocs);
+            lammps_gather_atoms(lmp, "image", 0, 1, my_images);
             if (this_local_proc == 0) {
               // Send my coordinates to my partner, recieve coordinates from my partner
               MPI_Sendrecv(my_coords,      3*natoms, MPI_DOUBLE, partner_proc, 0,
                            partner_coords, 3*natoms, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
               MPI_Sendrecv(my_velocs,      3*natoms, MPI_DOUBLE, partner_proc, 0,
                            partner_velocs, 3*natoms, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
+              MPI_Sendrecv(my_images,      natoms, MPI_LMP_TAGINT, partner_proc, 0,
+                           partner_images, natoms, MPI_LMP_TAGINT, partner_proc, 0, MPI_COMM_WORLD, &status);
             }
             MPI_Bcast(partner_coords, 3*natoms, MPI_DOUBLE, 0, subcomm);
             MPI_Bcast(partner_velocs, 3*natoms, MPI_DOUBLE, 0, subcomm);
+            MPI_Bcast(partner_images, natoms, MPI_LMP_TAGINT, 0, subcomm);
             // Set coordinates temporarily for energy computation
             lammps_scatter_atoms(lmp, "x", 1, 3, partner_coords);
             lammps_scatter_atoms(lmp, "v", 1, 3, partner_velocs);
+            lammps_scatter_atoms(lmp, "image", 0, 1, partner_images);
             lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
 
             // * Compute PE with my partner's coordinates * //
@@ -463,12 +471,17 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
         if (swap == 1 && idim == i_temp_dim) {
           // *** Temperature swapping *** //
           lammps_gather_atoms(lmp, "x", 1, 3, my_coords);
+          lammps_gather_atoms(lmp, "image", 0, 1, my_images);
           if (this_local_proc == 0) {
             MPI_Sendrecv(my_coords,      3*natoms, MPI_DOUBLE, partner_proc, 0,
                          partner_coords, 3*natoms, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(my_images,      natoms, MPI_LMP_TAGINT, partner_proc, 0,
+                         partner_images, natoms, MPI_LMP_TAGINT, partner_proc, 0, MPI_COMM_WORLD, &status);
           }
           MPI_Bcast(partner_coords, 3*natoms, MPI_DOUBLE, 0, subcomm);
+          MPI_Bcast(partner_images, natoms, MPI_LMP_TAGINT, 0, subcomm);
           lammps_scatter_atoms(lmp, "x", 1, 3, partner_coords);
+          lammps_scatter_atoms(lmp, "image", 0, 1, partner_images);
           // Recompute energy/force with my coordinates
           lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
           get_bias(lmp, fix, 0);
@@ -480,6 +493,7 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
           // Coordinates were swapped above in attempt but exchange failed. So, restore my coordinates. 
           lammps_scatter_atoms(lmp, "x", 1, 3, my_coords);
           lammps_scatter_atoms(lmp, "v", 1, 3, my_velocs);
+          lammps_scatter_atoms(lmp, "image", 0, 1, my_images);
           // Recompute energy/force with my coordinates
           lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
           get_bias(lmp, fix, 0);
@@ -575,5 +589,7 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     free(partner_coords);
     free(my_velocs);
     free(partner_velocs);
+    free(my_images);
+    free(partner_images);
 
 }

@@ -35,6 +35,10 @@
 // LAMMPS data type for timestep, may need to adjust manually to 32-bit for machine dependence
 #include <inttypes.h>
 typedef int64_t bigint;
+// LAMMPS data type for tag int, image flags
+typedef int tagint;
+#define MPI_LMP_TAGINT MPI_INT
+
 
 /*
  *  Data structure for a replica
