@@ -51,6 +51,33 @@ double get_bias(void *lmp, char* fix, int flag_skip)
   return bias;
 }
 
+// -- Velocity rescaling for temperature swapping -- //
+void scale_velocities(double myT, double partnerT, double *v, int natoms) 
+{
+  int i;
+  // remove net velocity. a precaution to avoid flying ice cube, thermostat should bring back heat lost here
+  double vx, vy, vz;
+  vx = vy = vz = 0.0;
+  for (i = 0; i < natoms; ++i) {
+    vx += v[3*i];
+    vy += v[3*i + 1];
+    vz += v[3*i + 2];
+  }
+  vx /= (double)natoms;
+  vy /= (double)natoms;
+  vz /= (double)natoms;
+  for (i = 0; i < natoms; ++i) {
+    v[3*i    ] -= vx;
+    v[3*i + 1] -= vy;
+    v[3*i + 2] -= vz;
+  }
+  // scale velocs so that they are at my subcomm's temperature
+  double scale = sqrt(myT / partnerT); 
+  for (i = 0; i < 3*natoms; ++i) {
+    v[i] *= scale;
+  }
+}
+
 // --- Main function --- //
 void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm, 
                     Replica *this_replica, char* fix, int sseed) 
@@ -471,22 +498,28 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
         if (swap == 1 && idim == i_temp_dim) {
           // *** Temperature swapping *** //
           lammps_gather_atoms(lmp, "x", 1, 3, my_coords);
+          lammps_gather_atoms(lmp, "v", 1, 3, my_velocs);
           lammps_gather_atoms(lmp, "image", 0, 1, my_images);
           if (this_local_proc == 0) {
             MPI_Sendrecv(my_coords,      3*natoms, MPI_DOUBLE, partner_proc, 0,
                          partner_coords, 3*natoms, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(my_velocs,      3*natoms, MPI_DOUBLE, partner_proc, 0,
+                         partner_velocs, 3*natoms, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
             MPI_Sendrecv(my_images,      natoms, MPI_LMP_TAGINT, partner_proc, 0,
                          partner_images, natoms, MPI_LMP_TAGINT, partner_proc, 0, MPI_COMM_WORLD, &status);
           }
+          // scale velocities to match new temperature
+          scale_velocities(world2temp[i_comm], world2temp[partner_comm], partner_velocs, natoms);
+          // now broadcast, scatter info
           MPI_Bcast(partner_coords, 3*natoms, MPI_DOUBLE, 0, subcomm);
+          MPI_Bcast(partner_velocs, 3*natoms, MPI_DOUBLE, 0, subcomm);
           MPI_Bcast(partner_images, natoms, MPI_LMP_TAGINT, 0, subcomm);
           lammps_scatter_atoms(lmp, "x", 1, 3, partner_coords);
+          lammps_scatter_atoms(lmp, "v", 1, 3, partner_velocs);
           lammps_scatter_atoms(lmp, "image", 0, 1, partner_images);
           // Recompute energy/force with my coordinates
           lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
           get_bias(lmp, fix, 0);
-          // scale velocities to match new temperature
-          lammps_scale_velocities(lmp, world2temp[i_comm], world2temp[partner_comm]);
         }
         else if (swap == 0 && idim != i_temp_dim && partner_proc != -1) {
           // *** Hamiltonian swapping *** // 
