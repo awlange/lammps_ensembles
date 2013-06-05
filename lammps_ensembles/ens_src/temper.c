@@ -27,7 +27,10 @@
 #include "library.h"
 #include "replica.h"
 
-void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int comm, double temp, char* fix, int sseed) {
+#define MAXCHARS 256
+
+void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, 
+            int comm, double temp, char* fix, int sseed, int dump_swap) {
 
 /*----------------------------------------------------------------------------------
  * grab info from args
@@ -179,6 +182,13 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int
     double pe, pe_partner, boltz_factor;
     double *pe_ptr;
     MPI_Status status;
+
+    // For swapping output file names
+    char *my_dumpfile      = (char *)malloc(sizeof(char) * MAXCHARS);
+    char *partner_dumpfile = (char *)malloc(sizeof(char) * MAXCHARS);
+
+
+    // ** The big old loop ** //
     for (iswap = 0; iswap < i_nswaps; iswap += 1) {
 
         // 1. run for one period of timesteps
@@ -274,6 +284,17 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int
 
             // reset temp_id
             i_temp_id = p_temp_id;
+
+            if (dump_swap) {
+              // swap dump file names for convenience in post-processing
+              strcpy(my_dumpfile, lammps_get_dump_file(lmp));
+              if (this_proc == 0) {
+                  MPI_Sendrecv(my_dumpfile,      MAXCHARS, MPI_CHAR, partner_proc, 0,
+                               partner_dumpfile, MAXCHARS, MPI_CHAR, partner_proc, 0, MPI_COMM_WORLD, &status);
+              }
+              MPI_Bcast(partner_dumpfile, MAXCHARS, MPI_CHAR, 0, subcomm);
+              lammps_change_dump_file(lmp, i_comm, partner_dumpfile); 
+            }
         }
 
         // 8. Update lookup table
@@ -313,5 +334,7 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int
     free(world2tempid);
     free(tempid2world);
     
+    free(my_dumpfile);
+    free(partner_dumpfile);
 
 }

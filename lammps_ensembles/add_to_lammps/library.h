@@ -43,6 +43,8 @@ void lammps_scatter_atoms(void *, char *, int, int, void *);
 
 void lammps_mod_inst(void *, int, char *, char *, void *);
 void lammps_scale_velocities(void *, double, double);
+void lammps_change_dump_file(void *, int, char *);
+char *lammps_get_dump_file(void *); 
 
 
 #ifdef __cplusplus

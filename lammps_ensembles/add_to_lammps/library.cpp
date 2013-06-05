@@ -40,6 +40,7 @@
 #include "finish.h"
 #include "output.h"
 #include "thermo.h"
+#include "dump.h"
 
 using namespace LAMMPS_NS;
 
@@ -604,7 +605,7 @@ void lammps_mod_inst(void *ptr, int type, char *id, char *command, void *arg) {
             lmp->update->integrate->setup();
         } else if(strcmp(command,"cleanup") == 0) {
             lmp->update->integrate->cleanup();
-        }  else if(strcmp(command,"setup_minimal") == 0) { 
+        } else if(strcmp(command,"setup_minimal") == 0) { 
             // AWGL
             lmp->update->integrate->setup_minimal(1);
         }
@@ -667,4 +668,27 @@ void lammps_scale_velocities(void *ptr, double my_temp, double p_temp) {
            v[i][2] = v[i][2] * sfactor;
         }
 
+}
+
+char *lammps_get_dump_file(void *ptr) {
+   LAMMPS *lmp = (LAMMPS *)ptr;
+   if (lmp->output->ndump > 0) {
+     Dump *dump = lmp->output->dump[0];
+     return dump->filename;
+   }
+   return NULL;
+}
+
+void lammps_change_dump_file(void *ptr, int comm, char *new_filename) {
+
+   LAMMPS *lmp = (LAMMPS *)ptr;
+   if (lmp->output->ndump > 0) {
+     // For now, only expect to do the 0-th dump
+     Dump *dump = lmp->output->dump[0];
+     dump->closefile(); // close current dump file
+     //printf("Old dump file on comm %d: %s\n", comm, dump->filename);
+     strcpy(dump->filename, new_filename);
+     //printf("New dump file on comm %d: %s\n", comm, dump->filename);
+     dump->openfile(); // open new dump file
+   }
 }

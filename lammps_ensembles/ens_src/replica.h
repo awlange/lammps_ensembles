@@ -62,7 +62,7 @@ typedef struct {
  *  Functions
  */ 
 
-void   temper(void *, MPI_Comm, int, int, int, int, double, char *, int);
+void   temper(void *, MPI_Comm, int, int, int, int, double, char *, int, int);
 double rng(int *);
 int    rng2_get_time_seed();
 void   rng2_seed(int);

@@ -247,6 +247,7 @@ int main(int argc, char **argv) {
     char fix[50], file[50];			// fix id, restart binary filename
     char CVID[50];			        // Collecvtive Variable ID 
     int replicaID = -1;                         // replica ID for coordx
+    int dump_swap = 0;                          // swap dump file names in temper
 
 
     // doing everything on root of subcomms
@@ -280,10 +281,10 @@ int main(int argc, char **argv) {
 
 		// scan values from line and clip commas off char *'s
 		if(temperflag) {
-			int n = fscanf(infile, "#TEMPER: run %d, swap %d, temp %lf, fix %s seed %d", 
-                                       &nsteps, &nevery, &temp, fix, &sseed);
-                        if (n != 5) {
-                          printf("%d %d %lf %s %d\n", nsteps, nevery, temp, fix, sseed);
+			int n = fscanf(infile, "#TEMPER: run %d, swap %d, temp %lf, fix %s seed %d, dumpswap %d", 
+                                       &nsteps, &nevery, &temp, fix, &sseed, &dump_swap);
+                        if (n != 6) {
+                          printf("%d %d %lf %s %d %d\n", nsteps, nevery, temp, fix, sseed, dump_swap);
                           printf("Problem reading #TEMPER line. Please check that formatting strictly complies.\n");
                           exit(1);
                         }
@@ -330,6 +331,7 @@ int main(int argc, char **argv) {
     MPI_Bcast(&nevery, 1, MPI_INT, 0, subcomm);
     MPI_Bcast(&bseed, 1, MPI_INT, 0, subcomm);
     MPI_Bcast(fix, 50, MPI_CHAR, 0, subcomm);
+    MPI_Bcast(&dump_swap, 1, MPI_INT, 0, subcomm); 
 
 	// print for error checking and bcast specific values
 	if(temperflag) {
@@ -510,7 +512,7 @@ int main(int argc, char **argv) {
     	    printf("---> Beginning replica exchange...\n\n"); 
 
         if (!skip_run)
-          temper(lmp, subcomm, nsteps, nevery, n_comms, split_key, temp, fix, sseed); 
+          temper(lmp, subcomm, nsteps, nevery, n_comms, split_key, temp, fix, sseed, dump_swap); 
     }
     else if(annealflag) {
        	if(this_global_proc == 0)
