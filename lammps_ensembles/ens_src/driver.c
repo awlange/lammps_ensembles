@@ -280,9 +280,10 @@ int main(int argc, char **argv) {
 
 		// scan values from line and clip commas off char *'s
 		if(temperflag) {
-			int n = fscanf(infile, "#TEMPER: run %d, swap %d, temp %lf, fix %s seed1 %d, seed2 %d", 
-                                       &nsteps, &nevery, &temp, fix, &sseed, &bseed);
-                        if (n != 6) {
+			int n = fscanf(infile, "#TEMPER: run %d, swap %d, temp %lf, fix %s seed %d", 
+                                       &nsteps, &nevery, &temp, fix, &sseed);
+                        if (n != 5) {
+                          printf("%d %d %lf %s %d\n", nsteps, nevery, temp, fix, sseed);
                           printf("Problem reading #TEMPER line. Please check that formatting strictly complies.\n");
                           exit(1);
                         }
@@ -340,7 +341,6 @@ int main(int argc, char **argv) {
 	        printf("---> Attempt exchange every %d timesteps\n", nevery);
 	        printf("---> Using fix id %s\n", fix);
 	        printf("---> Using random swap seed %d\n", sseed);
-		printf("---> Using metroplis seed %d + (global rank)\n", bseed);
 	    } if(this_local_proc == 0)
 		printf("---> Instance %d using temp %lf\n", split_key, temp);
 	    MPI_Bcast(&temp, 1, MPI_DOUBLE, 0, subcomm);
@@ -510,7 +510,7 @@ int main(int argc, char **argv) {
     	    printf("---> Beginning replica exchange...\n\n"); 
 
         if (!skip_run)
-          temper(lmp, subcomm, nsteps, nevery, n_comms, split_key, temp, fix, sseed, bseed); 
+          temper(lmp, subcomm, nsteps, nevery, n_comms, split_key, temp, fix, sseed); 
     }
     else if(annealflag) {
        	if(this_global_proc == 0)

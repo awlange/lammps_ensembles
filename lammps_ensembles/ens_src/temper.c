@@ -27,7 +27,7 @@
 #include "library.h"
 #include "replica.h"
 
-void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int comm, double temp, char* fix, int sseed, int bseed) {
+void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int comm, double temp, char* fix, int sseed) {
 
 /*----------------------------------------------------------------------------------
  * grab info from args
@@ -99,11 +99,23 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int
     int ranswapflag = 1;
     if(i_sseed == 0) ranswapflag = 0; 
 
-    int i_bseed = bseed + this_global_proc;
-    int warmup;
-    for (warmup = 0; warmup < 100; warmup++) {
-      rng(&i_bseed);
+    // Set up random number
+    if (i_sseed < 0) {
+      // If it's negative, the global root decides from the current time, 
+      // broadcasts, and other ranks add their global rank. All seeds should be unique.
+      int time_seed;
+      if (this_global_proc == 0)
+        time_seed = rng2_get_time_seed();
+      MPI_Bcast(&time_seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
+      rng2_seed(time_seed + this_global_proc);
+#ifdef COORDX_DEBUG
+      if(this_global_proc == 0) printf("Time seed = %d\n", time_seed);
+#endif
     }
+    else {
+      rng2_seed(i_sseed + this_global_proc);
+    }
+    
 
 /*----------------------------------------------------------------------------------
  * create lookup tables for useful values
@@ -148,6 +160,16 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int
 		printf("T%d\t", p);
 	printf("\n");
     }	
+    // Print initial status to screen
+    if(this_global_proc == 0) {
+        int *current_ptr = (int *)lammps_extract_global(lmp, "ntimestep");
+	printf("%d\t\t", *current_ptr);
+	int p;
+	for(p = 0; p < i_ncomms; p++) {
+	  printf("%d\t", world2tempid[p]);
+	}
+	printf("\n");
+     }
 
 /*----------------------------------------------------------------------------------
  * main loop - let's do some parallel tempering fo sho
@@ -174,7 +196,7 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int
         //        direction b/c rng might be different, I think. Anyhow, it works now.
         if (this_global_proc == 0) {
           if (ranswapflag == 0)         dir = iswap % 2;
-          else if (rng(&i_sseed) < 0.5) dir = 0;
+          else if (rng2() < 0.5) dir = 0;
           else                          dir = 1;
         }
         // broadcast direction to all procs
@@ -220,7 +242,7 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int
                     boltz_factor = (pe - pe_partner) * 
                                    (1.0 / (boltz * tempid2temp[i_temp_id]) -
                                     1.0 / (boltz * tempid2temp[p_temp_id]));
-					double my_rand = rng(&i_bseed);
+					double my_rand = rng2();
 #ifdef TEMPER_DEBUG
 	            printf("delta: %lf, probability: %lf, rand: %lf\n", boltz_factor, exp(boltz_factor), my_rand);
 #endif
@@ -277,6 +299,10 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, int
 /*----------------------------------------------------------------------------------
  * clean it up
  */
+
+    if (this_global_proc == 0) {
+      printf("Parallel tempering complete. Cleaning up LAMMPS...\n");
+    }
 
     lammps_mod_inst(lmp, 3, NULL, "cleanup", NULL);
     lammps_mod_inst(lmp, 0, NULL, "finish", NULL);

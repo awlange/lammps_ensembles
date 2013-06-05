@@ -17,8 +17,8 @@ LIB = -llammps_mac_awgl $(LIBCOLVARS) -lcolvars
 
 # Debugging flags
 #DEBUG = -g -DCOORDX_DEBUG 
-#DEBUG = -g -DCOORDX_DEBUG -DCOORDX_DEBUG_LEVEL_TWO
-DEBUG = -g
+DEBUG = -g -DCOORDX_DEBUG -DCOORDX_DEBUG_LEVEL_TWO
+#DEBUG = -g
 
 # Compiler flags, optimizations
 CCFLAGS = -O3 -fopenmp $(DEBUG) -I$(LAMMPSDIR) 
