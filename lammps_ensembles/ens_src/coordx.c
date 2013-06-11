@@ -411,6 +411,10 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
         else {
           // *** Hamiltonian swapping dimensions *** //
           if (partner_proc != -1) {
+            // ** Experimental stuff for mapping ** //
+            int my_map_size = lammps_get_map_size(lmp);
+            printf("comm: %d local_proc: %d map_size = %d\n", i_comm, this_local_proc, my_map_size);
+
             // Get my coordinates and velocities 
             lammps_gather_atoms(lmp, "x", 1, 3, my_coords);
             lammps_gather_atoms(lmp, "v", 1, 3, my_velocs);

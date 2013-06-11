@@ -288,12 +288,17 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms,
             if (dump_swap) {
               // swap dump file names for convenience in post-processing
               strcpy(my_dumpfile, lammps_get_dump_file(lmp));
-              if (this_proc == 0) {
-                  MPI_Sendrecv(my_dumpfile,      MAXCHARS, MPI_CHAR, partner_proc, 0,
-                               partner_dumpfile, MAXCHARS, MPI_CHAR, partner_proc, 0, MPI_COMM_WORLD, &status);
+              if (my_dumpfile != NULL) {
+                if (this_proc == 0) {
+                    MPI_Sendrecv(my_dumpfile,      MAXCHARS, MPI_CHAR, partner_proc, 0,
+                                 partner_dumpfile, MAXCHARS, MPI_CHAR, partner_proc, 0, MPI_COMM_WORLD, &status);
+                }
+                MPI_Bcast(partner_dumpfile, MAXCHARS, MPI_CHAR, 0, subcomm);
+                lammps_change_dump_file(lmp, i_comm, partner_dumpfile);
+              } else {
+               printf("Error: No dump file specified for TEMPER module to swap. Check inputs.\n");
+               exit(1);
               }
-              MPI_Bcast(partner_dumpfile, MAXCHARS, MPI_CHAR, 0, subcomm);
-              lammps_change_dump_file(lmp, i_comm, partner_dumpfile); 
             }
         }
 
