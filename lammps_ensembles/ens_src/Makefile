@@ -5,23 +5,24 @@
 # Compiler executable
 CC = mpicc
 
-# point to LAMMPS source directory where library has been compiled
-LAMMPSDIR = /Users/alange/research/lammps/lammps-9Mar13/src 
+# point to LAMMPS source directory where library has been compiled (don't leave space at end!)
+LAMMPSDIR = /Users/alange/research/lammps_ensembles/LE_070113/lammps-9Mar13
+LAMMPSSRC = $(LAMMPSDIR)/src
 
 # External library paths and identifiers
 #LIB = -llammps_mira -lfftw3f
 #LIBDIR = /usr/lib
-LIBCOLVARS = -L/Users/alange/research/lammps/lammps-9Mar13/lib/colvars/
+LIBCOLVARS = $(LAMMPSDIR)/lib/colvars/
 LIBDIR = 
-LIB = -llammps_mac_awgl $(LIBCOLVARS) -lcolvars 
+LIB = -llammps_mac_awgl -L$(LIBCOLVARS) -lcolvars 
 
 # Debugging flags
-#DEBUG = -g -DCOORDX_DEBUG 
-DEBUG = -g -DCOORDX_DEBUG -DCOORDX_DEBUG_LEVEL_TWO
+DEBUG = -g -DCOORDX_DEBUG 
+#DEBUG = -g -DCOORDX_DEBUG -DCOORDX_DEBUG_LEVEL_TWO
 #DEBUG = -g
 
 # Compiler flags, optimizations
-CCFLAGS = -O3 -fopenmp $(DEBUG) -I$(LAMMPSDIR) 
+CCFLAGS = -O3 -fopenmp $(DEBUG) -I$(LAMMPSSRC) 
 
 #----------------------------------------------------
 
@@ -32,7 +33,7 @@ INC = $(wildcard *.h)
 OBJ = $(SRC:.c=.o)
 
 install: $(OBJ) 
-	$(CC) $(CCFLAGS) $(LIBDIR) -L$(LAMMPSDIR) \
+	$(CC) $(CCFLAGS) $(LIBDIR) -L$(LAMMPSSRC) \
 	$(OBJ) \
 	$(LIB) -lstdc++ -lm -o ens_driver
 
