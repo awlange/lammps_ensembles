@@ -41,6 +41,8 @@
 #include "output.h"
 #include "thermo.h"
 #include "dump.h"
+#include "fix_colvars.h"
+#include "colvarproxy_lammps.h"
 
 using namespace LAMMPS_NS;
 
@@ -670,6 +672,8 @@ void lammps_scale_velocities(void *ptr, double my_temp, double p_temp) {
 
 }
 
+/* dump file stuff */
+
 char *lammps_get_dump_file(void *ptr) {
    LAMMPS *lmp = (LAMMPS *)ptr;
    if (lmp->output->ndump > 0) {
@@ -691,4 +695,77 @@ void lammps_change_dump_file(void *ptr, int comm, char *new_filename) {
      //printf("New dump file on comm %d: %s\n", comm, dump->filename);
      dump->openfile(); // open new dump file
    }
+}
+
+/*  colvar exchange stuff */
+void lammps_modify_colvar(void *ptr, char *id, int which, double *var, char *filename)
+{
+  // modify the colvar fix or extract data from it
+  // this calls the FixColvars function modify_fix
+  LAMMPS *lmp = (LAMMPS *)ptr;
+  int ifix = lmp->modify->find_fix(id);
+  if (ifix < 0) return;
+  Fix *fix = lmp->modify->fix[ifix];
+  fix->modify_fix(which, var, filename);
+}
+
+
+/* Attempting to fix the mapping schtuff */
+
+int *lammps_get_map_array(void *ptr) {
+    LAMMPS *lmp = (LAMMPS *)ptr;
+    return lmp->atom->get_map_array();
+}
+
+int lammps_get_map_size(void *ptr) {
+    LAMMPS *lmp = (LAMMPS *)ptr;
+    return lmp->atom->get_map_size();
+}
+
+void lammps_set_map_array(void *ptr, int *new_map, int new_nlocal) {
+    LAMMPS *lmp = (LAMMPS *)ptr;
+    lmp->atom->nlocal = new_nlocal;
+    
+    //int *map = lmp->atom->get_map_array();
+    //int nmap = lmp->atom->get_map_size();
+    //for (int i = 0; i < nmap; ++i) {
+    //  map[i] = new_map[i];
+    //}    
+}
+
+void lammps_get_atom_x_v_i(void *ptr, double *xout, double *vout, tagint *iout, int *maskout) {
+    LAMMPS *lmp = (LAMMPS *)ptr;
+    double **x = lmp->atom->x;
+    double **v = lmp->atom->v;
+    tagint *im = lmp->atom->image; 
+    int *mask  = lmp->atom->mask;
+    int nlocal = lmp->atom->nlocal;
+    for (int i = 0; i < nlocal; ++i) {
+      xout[3*i]     = x[i][0]; 
+      xout[3*i + 1] = x[i][1]; 
+      xout[3*i + 2] = x[i][2]; 
+      vout[3*i]     = v[i][0]; 
+      vout[3*i + 1] = v[i][1]; 
+      vout[3*i + 2] = v[i][2]; 
+      iout[i]       = im[i];
+      maskout[i]    = mask[i];
+    }
+}
+void lammps_set_atom_x_v_i(void *ptr, double *xin, double *vin, tagint *iin, int *maskin) {
+    LAMMPS *lmp = (LAMMPS *)ptr;
+    double **x = lmp->atom->x;
+    double **v = lmp->atom->v;
+    tagint *im = lmp->atom->image; 
+    int *mask  = lmp->atom->mask;
+    int nlocal = lmp->atom->nlocal;
+    for (int i = 0; i < nlocal; ++i) {
+      x[i][0] = xin[3*i];
+      x[i][1] = xin[3*i + 1];
+      x[i][2] = xin[3*i + 2];
+      v[i][0] = vin[3*i];
+      v[i][1] = vin[3*i + 1];
+      v[i][2] = vin[3*i + 2];
+      im[i]   = iin[i];
+      mask[i] = maskin[i];
+    }
 }

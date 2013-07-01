@@ -33,6 +33,8 @@
 #include "update.h"
 
 #include "colvarproxy_lammps.h"
+// awgl
+#include "colvarbias.h"
 
 /* re-usable integer hash table code with static linkage. */
 
@@ -867,4 +869,48 @@ double FixColvars::memory_usage(void)
   double bytes = (double) (num_coords * (2*sizeof(int)+3*sizeof(double)));
   bytes += (double) (nmax*size_one) + sizeof(this);
   return bytes;
+}
+
+/* ---------------------------------------------------------------------- */
+// awgl
+void FixColvars::modify_fix(int which, double *var, char *filename) 
+{
+  if (me != 0) return;
+
+  // Only one bias for now
+  colvarbias *b = proxy->colvars->biases[0];
+
+  if (which == 0) {
+    // extract the colvar_center value
+    var[0] = b->extract_value(0);
+    var[1] = b->extract_value(1);
+  }
+  else if (which == 1) {
+    // change the colvar_center value
+    std::ostringstream os0, os1;
+    os0 << var[0]; 
+    os1 << var[1]; 
+    std::string str = "";
+    str.append("forceConstant " + os0.str() + "\n");
+    str.append("centers " + os1.str() + "\n");
+    b->change_configuration(str); 
+  }
+  else if (which == 3) {
+    // close the output file and make append true for re-opening
+    proxy->colvars->cv_traj_os.close();
+    proxy->colvars->cv_traj_append = true;
+  }
+  else if (which == 4) {
+    // get current output file name
+    filename[proxy->colvars->cv_traj_name.size()] = 0; // to NULL terminate
+    memcpy(filename, proxy->colvars->cv_traj_name.c_str(), proxy->colvars->cv_traj_name.size());
+  }
+  else if (which == 5) {
+    // change output file name
+    proxy->colvars->cv_traj_name.clear();
+    proxy->colvars->cv_traj_name.assign(filename);
+  }
+  else { 
+    printf("invalid which option for modify_fix.\n");
+  }
 }

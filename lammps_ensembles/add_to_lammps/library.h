@@ -16,6 +16,8 @@
    new LAMMPS-specific functions can be added
 */
 
+//typedef int tagint;
+//#include "lmptype.h"
 #include "mpi.h"
 
 /* ifdefs allow this file to be included in a C program */
@@ -46,6 +48,14 @@ void lammps_scale_velocities(void *, double, double);
 void lammps_change_dump_file(void *, int, char *);
 char *lammps_get_dump_file(void *); 
 
+void lammps_modify_colvar(void *, char *, int, double *, char *);
+
+/* Mapping stuff */
+int *lammps_get_map_array(void *ptr);
+int lammps_get_map_size(void *ptr);
+void lammps_set_map_array(void *, int *, int);
+void lammps_get_atom_x_v_i(void *, double *, double *, int *, int *);
+void lammps_set_atom_x_v_i(void *, double *, double *, int *, int *);
 
 #ifdef __cplusplus
 }
