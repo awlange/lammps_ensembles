@@ -66,7 +66,6 @@ void scale_velocities(double myT, double partnerT, double *v, int natoms)
 void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm, 
                     Replica *this_replica, char* fix, int sseed) 
 {
-
    // ************* Crash b/c this shit ain't working ****************** //
    // There is an unresolved, unknown problem when scaling up to larger numbers of processors
    // and how replicas get new coordinates. This code is very close, but is just missing something...

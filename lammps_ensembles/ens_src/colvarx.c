@@ -351,6 +351,11 @@ void colvar_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 	  // While this is not a necessary step for CV swaps, it is here for generality in order to allow
 	  // the user to do Hamiltonian exchange without colvars. 
 	  pe_ptr  = (double *)lammps_extract_compute(lmp, "pe", 0, 0);
+          if (pe_ptr == NULL) {
+            printf("ERROR. Compute pe returned a NULL pointer on subcomm %d\n", i_comm);
+            printf("Likely forgot to include 'compute pe all pe' in LAMMPS input script.\n");
+            exit(1);
+          }
 	  pe_swap = *pe_ptr;
 	  
 	  // Compute my bias with partner's coordinates (note: this is skipped if fix="none")
