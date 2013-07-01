@@ -1,10 +1,10 @@
-#COORDX: fix none, seed 0
-#REPLICA: id 3, ndim 1, temp 305.0, tdim -1
-#DIMENSION: 0 num 3 run 500 swaps 5
-#NEIGHBORS: 0 2 -1
+#COLVARX: fix cv, seed 0
+#REPLICA: id 2, ndim 1, temp 275.0, tdim -1
+#DIMENSION: 0 num 2 run 500 swaps 5
+#NEIGHBORS: 0 1 3
 
-variable        replicaID   string  3
-variable        replicaTemp string  300.0
+variable        replicaID   string  2
+variable        replicaTemp string  275.0
 
 # Solvated 5-mer peptide
 
@@ -30,12 +30,15 @@ group		peptide type <= 12
 fix		1 all nvt temp ${replicaTemp} ${replicaTemp} 100.0 tchain 1
 fix		4 all shake 0.0001 10 100 b 4 6 8 10 12 14 18 a 31
 
+# The colvars fix, read info from file
+fix		cv all colvars peptide.colvars.${replicaID} output out.${replicaID}
+
 # Dump for viewing
 dump		1 peptide custom 2 dump.colvar.lammpstrj.${replicaID} id xu yu zu
 dump_modify     1 sort id
 
-thermo_style	custom step temp etotal pe ke epair ebond
+thermo_style	custom step temp etotal pe ke epair ebond f_cv
 thermo		10
 
-# Mandatory line for scale swapping!
+# Mandatory line for swapping!
 compute pe all pe

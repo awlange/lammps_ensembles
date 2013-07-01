@@ -70,7 +70,7 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
    // There is an unresolved, unknown problem when scaling up to larger numbers of processors
    // and how replicas get new coordinates. This code is very close, but is just missing something...
    // Need a project? Get this to work!
-   printf("Sorry. COORX is not working, even though it sometimes seems like it is.\n");
+   printf("Sorry. COORDX is not working, even though it sometimes seems like it is.\n");
    exit(1);
 
 /*----------------------------------------------------------------------------------
