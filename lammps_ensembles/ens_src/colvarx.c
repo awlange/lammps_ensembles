@@ -35,44 +35,10 @@
  */
 
 
-// -- Velocity rescaling for temperature swapping -- //
-void scale_velocities(double myT, double partnerT, double *v, int natoms) 
-{
-  int i;
-  // remove net velocity. a precaution to avoid flying ice cube, thermostat should bring back heat lost here
-  double vx, vy, vz;
-  vx = vy = vz = 0.0;
-  for (i = 0; i < natoms; ++i) {
-    vx += v[3*i];
-    vy += v[3*i + 1];
-    vz += v[3*i + 2];
-  }
-  vx /= (double)natoms;
-  vy /= (double)natoms;
-  vz /= (double)natoms;
-  for (i = 0; i < natoms; ++i) {
-    v[3*i    ] -= vx;
-    v[3*i + 1] -= vy;
-    v[3*i + 2] -= vz;
-  }
-  // scale velocs so that they are at my subcomm's temperature
-  double scale = sqrt(myT / partnerT); 
-  for (i = 0; i < 3*natoms; ++i) {
-    v[i] *= scale;
-  }
-}
-
 // --- Main function --- //
-void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm, 
-                    Replica *this_replica, char* fix, int sseed) 
+void colvar_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm, 
+                     Replica *this_replica, char* fix, int sseed) 
 {
-
-   // ************* Crash b/c this shit ain't working ****************** //
-   // There is an unresolved, unknown problem when scaling up to larger numbers of processors
-   // and how replicas get new coordinates. This code is very close, but is just missing something...
-   // Need a project? Get this to work!
-   printf("Sorry. COORX is not working, even though it sometimes seems like it is.\n");
-   exit(1);
 
 /*----------------------------------------------------------------------------------
  * MPI things
@@ -88,7 +54,7 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     MPI_Comm_rank(MPI_COMM_WORLD, &this_global_proc);
 
 #ifdef COORDX_DEBUG_LEVEL_TWO
-    if (this_global_proc == 0) printf("Now in coordx.c\n");
+    if (this_global_proc == 0) printf("Now in colvar.c\n");
 #endif
 
 /*----------------------------------------------------------------------------------
@@ -214,20 +180,6 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 
     lammps_mod_inst(lmp, 3, NULL, "setup", NULL);
 
-/*----------------------------------------------------------------------------------
- *  Set up atom arrays for swapping coordinates and velocities 
- */
-
-    int natoms = lammps_get_natoms(lmp);
-    double *my_coords      = (double *)malloc(sizeof(double) * 3*natoms); 
-    double *partner_coords = (double *)malloc(sizeof(double) * 3*natoms); 
-    double *my_velocs      = (double *)malloc(sizeof(double) * 3*natoms); 
-    double *partner_velocs = (double *)malloc(sizeof(double) * 3*natoms); 
-    // images
-    tagint *my_images      = (int *)malloc(sizeof(int) * natoms); 
-    tagint *partner_images = (int *)malloc(sizeof(int) * natoms); 
-    int *my_mask           = (int *)malloc(sizeof(int) * natoms); 
-    int *partner_mask      = (int *)malloc(sizeof(int) * natoms); 
 
 /*----------------------------------------------------------------------------------
  * Swap statistics 
@@ -280,6 +232,13 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     double pe_bias_swap;         
     double pe_bias_partner_swap; 
     MPI_Status status;
+
+    // colvar data: 0 = force_k, 1 = colvar_center
+    double my_colvar_data[2];
+    double partner_colvar_data[2]; 
+    char *my_out_filename      = (char *)malloc(sizeof(char) * 256);
+    char *partner_out_filename = (char *)malloc(sizeof(char) * 256);
+ 
 
     int n_swap_runs_completed = 0;
 
@@ -359,158 +318,83 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
         }
 #endif
 
-        // Get nlocal for swaps
-        int my_nlocal, partner_nlocal, *current_ptr;
-
         /*-------------------------------------------------------------------------*/
         // 6. figure out if swap is okay
         swap = 0;
         n_swaps_attempted = 0;
         n_swaps_successful = 0;
-        if (idim == i_temp_dim) {
-          // *** Temperature swapping dimension *** //
-          if (partner_proc != -1) {
-            if (this_local_proc == 0) {
-                n_swaps_attempted = 1;
-                if (this_global_proc > partner_proc) {
-                  // higher proc sends pe to lower proc
-                  MPI_Send(&pe_bias, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD);
-                } else {
-                  // lower proc recieves
-                  MPI_Recv(&pe_bias_partner, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-                }
-                // lower proc does calculations
-                if (this_global_proc < partner_proc) {
-                    delta = (pe_bias_partner - pe_bias) * 
-                             (1.0 / (boltz * world2temp[partner_comm]) -
-                              1.0 / (boltz * world2temp[i_comm]));
-                    double my_rand = rng2();
-                    // make decision monte carlo style
-                    if (delta >= 0.0) swap = 1; // criterion of e^0 or greater -> probability of 1
-                    else if (my_rand < exp(delta)) swap = 1; 
-#ifdef COORDX_DEBUG
-                    double prob = exp(delta);
-                    if (delta >= 0.0) prob = 1.0;
-                    printf("%d<-->%d pe_bias: %lf p_pe_bias: %lf  delta: %lf, probability: %f, rand: %lf swap: %d\n", 
-                            i_comm, partner_comm, pe_bias, pe_bias_partner, delta, prob, my_rand, swap);
-#endif
-                }
-                // send decision to higher proc
-                if (this_global_proc < partner_proc) {
-                    MPI_Send(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD);
-                } else {
-                    MPI_Recv(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD, &status);
-                }
-            }
-          } 
-        }
-        else {
-          // *** Hamiltonian swapping dimensions *** //
-          if (partner_proc != -1) {
-            // ** Experimental stuff for mapping ** //
-            // get nlocal stuff
-            current_ptr = (int *)lammps_extract_global(lmp, "nlocal");
-            my_nlocal = *current_ptr; 
+        // *** Hamiltonian swapping dimensions *** //
+	if (partner_proc != -1) {
 
-            //int map_size = lammps_get_map_size(lmp); // replicas and procs should have same map_size
-            //int *my_map = lammps_get_map_array(lmp);
-            //int *partner_map = (int *)malloc(sizeof(int) * map_size);
-            //MPI_Sendrecv(my_map,      map_size, MPI_INT, partner_proc + this_local_proc, 0,
-            //             partner_map, map_size, MPI_INT, partner_proc + this_local_proc, 0, MPI_COMM_WORLD, &status);
+	  if (this_local_proc == 0) {
+            // Close output
+            lammps_modify_colvar(lmp, fix, 3, NULL, NULL);
+            // Extract my center
+            lammps_modify_colvar(lmp, fix, 0, my_colvar_data, NULL);
+            // Get current output file name
+            lammps_modify_colvar(lmp, fix, 4, NULL, my_out_filename);
+            // Communicate
+            MPI_Sendrecv(my_colvar_data,      2, MPI_DOUBLE, partner_proc, 0,
+                         partner_colvar_data, 2, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(my_out_filename,      256, MPI_CHAR, partner_proc, 1,
+                         partner_out_filename, 256, MPI_CHAR, partner_proc, 1, MPI_COMM_WORLD, &status);
+            // Set my center to partner's
+            lammps_modify_colvar(lmp, fix, 1, partner_colvar_data, NULL);
+            // Set output file name to partner's
+            lammps_modify_colvar(lmp, fix, 5, NULL, partner_out_filename);
+          }
 
-            //int nn = 1;
-            //if (this_global_proc == nn) printf("B comm %d %d: map %d\n", i_comm, this_global_proc, my_map[2733]);
-            //if (this_local_proc == 0) printf("B comm: %d proc: %d nlocal %d\n", i_comm, this_local_proc, my_nlocal);
+	  //lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
 
-            // Get my coordinates and velocities 
-            lammps_get_atom_x_v_i(lmp, my_coords, my_velocs, my_images, my_mask);
-            //lammps_gather_atoms(lmp, "x", 1, 3, my_coords);
-            //lammps_gather_atoms(lmp, "v", 1, 3, my_velocs);
-            ////lammps_gather_atoms(lmp, "image", 0, 1, my_images);
-            //if (this_local_proc == 0) {
-              // Send my coordinates to my partner, recieve coordinates from my partner
-              MPI_Sendrecv(my_coords,      3*natoms, MPI_DOUBLE, partner_proc + this_local_proc, 0,
-                           partner_coords, 3*natoms, MPI_DOUBLE, partner_proc + this_local_proc, 0, MPI_COMM_WORLD, &status);
-              MPI_Sendrecv(my_velocs,      3*natoms, MPI_DOUBLE, partner_proc + this_local_proc, 1,
-                           partner_velocs, 3*natoms, MPI_DOUBLE, partner_proc + this_local_proc, 1, MPI_COMM_WORLD, &status);
-              MPI_Sendrecv(my_images,      natoms, MPI_LMP_TAGINT, partner_proc + this_local_proc, 2,
-                           partner_images, natoms, MPI_LMP_TAGINT, partner_proc + this_local_proc, 2, MPI_COMM_WORLD, &status);
-              MPI_Sendrecv(my_mask,        natoms, MPI_INT, partner_proc + this_local_proc, 3,
-                           partner_mask,   natoms, MPI_INT, partner_proc + this_local_proc, 3, MPI_COMM_WORLD, &status);
-            //}
-            //MPI_Bcast(partner_coords, 3*natoms, MPI_DOUBLE, 0, subcomm);
-            //MPI_Bcast(partner_velocs, 3*natoms, MPI_DOUBLE, 0, subcomm);
-            ////MPI_Bcast(partner_images, natoms, MPI_LMP_TAGINT, 0, subcomm);
-            // swap nlocal
-            MPI_Sendrecv(&my_nlocal,      1, MPI_LMP_TAGINT, partner_proc + this_local_proc, 4,
-                         &partner_nlocal, 1, MPI_LMP_TAGINT, partner_proc + this_local_proc, 4, MPI_COMM_WORLD, &status);
-            //printf("this_global_proc = %d : my_nlocal = %d partner_nlocal = %d\n", this_global_proc, my_nlocal, partner_nlocal);
-
-            //lammps_set_map_array(lmp, partner_map, partner_nlocal); // change map to partner's and nlocal
-            lammps_set_map_array(lmp, NULL, partner_nlocal); // change map to partner's and nlocal
-            lammps_set_atom_x_v_i(lmp, partner_coords, partner_velocs, partner_images, partner_mask);
-            //if (this_global_proc == nn) printf("A comm %d %d: map %d\n", i_comm, this_global_proc, my_map[2733]);
-            //current_ptr = (int *)lammps_extract_global(lmp, "nlocal");
-            //my_nlocal = *current_ptr; 
-            //if (this_local_proc == 0) printf("A comm: %d proc: %d nlocal %d\n", i_comm, this_local_proc, my_nlocal);
-            //free(partner_map);
-
-            // Set coordinates temporarily for energy computation
-            ////lammps_scatter_atoms(lmp, "image", 0, 1, partner_images);
-            //lammps_scatter_atoms(lmp, "x", 1, 3, partner_coords);
-            //lammps_scatter_atoms(lmp, "v", 1, 3, partner_velocs);
-            lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
-
-            // * Compute PE with my partner's coordinates * //
-            // Currently, this line REQUIRES that the input script contains the line "compute pe all pe"
-            // While this is not a necessary step for CV swaps, it is here for generality in order to allow
-            // the user to do Hamiltonian exchange without colvars. 
-            pe_ptr  = (double *)lammps_extract_compute(lmp, "pe", 0, 0);
-            pe_swap = *pe_ptr;
-            
-            // Compute my bias with partner's coordinates (note: this is skipped if fix="none")
-            bias_swap    = get_bias(lmp, fix, 0);
-            pe_bias_swap = pe_swap + bias_swap;
+	  // * Compute PE with my partner's coordinates * //
+	  // Currently, this line REQUIRES that the input script contains the line "compute pe all pe"
+	  // While this is not a necessary step for CV swaps, it is here for generality in order to allow
+	  // the user to do Hamiltonian exchange without colvars. 
+	  pe_ptr  = (double *)lammps_extract_compute(lmp, "pe", 0, 0);
+	  pe_swap = *pe_ptr;
+	  
+	  // Compute my bias with partner's coordinates (note: this is skipped if fix="none")
+	  bias_swap    = get_bias(lmp, fix, 0);
+	  pe_bias_swap = pe_swap + bias_swap;
 #ifdef COORDX_DEBUG_LEVEL_TWO
-            printf("subcomm %d : bias %f bias_swap %f\n", i_comm, bias, bias_swap);
+          printf("subcomm %d : bias %f bias_swap %f\n", i_comm, bias, bias_swap);
 #endif
 
-            if (this_local_proc == 0) {
-                n_swaps_attempted = 1;
-                if (this_global_proc > partner_proc) {
-                  // higher proc sends pe_swap to lower proc
-                  MPI_Send(&pe_bias,      1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD);
-                  MPI_Send(&pe_bias_swap, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD);
-                } else {
-                  // lower proc recieves
-                  MPI_Recv(&pe_bias_partner,      1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-                  MPI_Recv(&pe_bias_partner_swap, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-                }
-                // lower proc does calculations
-                if (this_global_proc < partner_proc) {
-                    delta  = (pe_bias_swap + pe_bias_partner_swap) - (pe_bias + pe_bias_partner);
-                    delta /= boltz * world2temp[i_comm];
-                    double my_rand = rng2();
-                    // make decision monte carlo style
-                    if (delta <= 0.0) swap = 1; // criterion of e^0 or greater -> probability of 1
-                    else if (my_rand < exp(-delta)) swap = 1; 
+	  if (this_local_proc == 0) {
+	      n_swaps_attempted = 1;
+	      if (this_global_proc > partner_proc) {
+		// higher proc sends pe_swap to lower proc
+		MPI_Send(&pe_bias,      1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD);
+		MPI_Send(&pe_bias_swap, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD);
+	      } else {
+		// lower proc recieves
+		MPI_Recv(&pe_bias_partner,      1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
+		MPI_Recv(&pe_bias_partner_swap, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
+	      }
+	      // lower proc does calculations
+	      if (this_global_proc < partner_proc) {
+		  delta  = (pe_bias_swap + pe_bias_partner_swap) - (pe_bias + pe_bias_partner);
+		  delta /= boltz * world2temp[i_comm];
+		  double my_rand = rng2();
+		  // make decision monte carlo style
+		  if (delta <= 0.0) swap = 1; // criterion of e^0 or greater -> probability of 1
+		  else if (my_rand < exp(-delta)) swap = 1; 
 #ifdef COORDX_DEBUG
-                    double prob = exp(-delta);
-                    if (delta <= 0.0) prob = 1.0;
-                    printf("Swap %d : %d<-->%d pe_b: %lf p_pe_b: %lf pe_b_swap: %lf p_pe_b_swap: %lf delta: %lf, probability: %f, rand: %lf swap: %d\n", 
-                            iswap, i_comm, partner_comm, pe_bias, pe_bias_partner, pe_bias_swap, pe_bias_partner_swap, 
-                            delta, prob, my_rand, swap);
+		  double prob = exp(-delta);
+		  if (delta <= 0.0) prob = 1.0;
+		  printf("Swap %d : %d<-->%d pe_b: %lf p_pe_b: %lf pe_b_swap: %lf p_pe_b_swap: %lf delta: %lf, probability: %f, rand: %lf swap: %d\n", 
+			  iswap, i_comm, partner_comm, pe_bias, pe_bias_partner, pe_bias_swap, pe_bias_partner_swap, 
+			  delta, prob, my_rand, swap);
 #endif
-                }
-                // send decision to higher proc
-                if (this_global_proc < partner_proc) {
-                    MPI_Send(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD);
-                } else {
-                    MPI_Recv(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD, &status);
-                }
-            }
-          } 
-        }
+              }
+              // send decision to higher proc
+              if (this_global_proc < partner_proc) {
+                  MPI_Send(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD);
+              } else {
+                  MPI_Recv(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD, &status);
+              }
+          }
+        } 
 
         // broadcast decision to subcomm
         MPI_Bcast(&swap, 1, MPI_INT, 0, subcomm);
@@ -522,49 +406,19 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
           i_replica_id = p_replica_id;
           this_replica->id = i_replica_id;
           n_swaps_successful = 1; // for stats
+          // nothing more to do since colvar data exchanged above already.
         }
-        if (swap == 1 && idim == i_temp_dim) {
-          // *** Temperature swapping *** //
-          lammps_gather_atoms(lmp, "x", 1, 3, my_coords);
-          lammps_gather_atoms(lmp, "v", 1, 3, my_velocs);
-          lammps_gather_atoms(lmp, "image", 0, 1, my_images);
-          if (this_local_proc == 0) {
-            MPI_Sendrecv(my_coords,      3*natoms, MPI_DOUBLE, partner_proc, 0,
-                         partner_coords, 3*natoms, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-            MPI_Sendrecv(my_velocs,      3*natoms, MPI_DOUBLE, partner_proc, 0,
-                         partner_velocs, 3*natoms, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-            MPI_Sendrecv(my_images,      natoms, MPI_LMP_TAGINT, partner_proc, 0,
-                         partner_images, natoms, MPI_LMP_TAGINT, partner_proc, 0, MPI_COMM_WORLD, &status);
+        else if (swap == 0 && partner_proc != -1) {
+          // Coordinates were swapped above in attempt but exchange failed. So, restore my colvar data. 
+	  if (this_local_proc == 0) {
+            lammps_modify_colvar(lmp, fix, 1, my_colvar_data, NULL);
+            lammps_modify_colvar(lmp, fix, 5, NULL, my_out_filename);
           }
-          // scale velocities to match new temperature
-          scale_velocities(world2temp[i_comm], world2temp[partner_comm], partner_velocs, natoms);
-          // now broadcast, scatter info
-          MPI_Bcast(partner_coords, 3*natoms, MPI_DOUBLE, 0, subcomm);
-          MPI_Bcast(partner_velocs, 3*natoms, MPI_DOUBLE, 0, subcomm);
-          MPI_Bcast(partner_images, natoms, MPI_LMP_TAGINT, 0, subcomm);
-          lammps_scatter_atoms(lmp, "x", 1, 3, partner_coords);
-          lammps_scatter_atoms(lmp, "v", 1, 3, partner_velocs);
-          lammps_scatter_atoms(lmp, "image", 0, 1, partner_images);
-          // Recompute energy/force with my coordinates
-          lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
+          // Recompute energy/force with my stuff 
+          //lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
           get_bias(lmp, fix, 0);
         }
-        else if (swap == 0 && idim != i_temp_dim && partner_proc != -1) {
-          // *** Hamiltonian swapping *** // 
-          // --- new
-            lammps_set_map_array(lmp, NULL, my_nlocal);
-            lammps_set_atom_x_v_i(lmp, my_coords, my_velocs, my_images, my_mask);
 
-          // --- old
-          // Coordinates were swapped above in attempt but exchange failed. So, restore my coordinates. 
-          //lammps_scatter_atoms(lmp, "x", 1, 3, my_coords);
-          //lammps_scatter_atoms(lmp, "v", 1, 3, my_velocs);
-          //lammps_scatter_atoms(lmp, "image", 0, 1, my_images);
-
-          // Recompute energy/force with my coordinates
-          lammps_mod_inst(lmp, 3, NULL, "setup_minimal", NULL);
-          get_bias(lmp, fix, 0);
-        }
         // swap stats
         if (this_local_proc == 0) {
           int sbufi = n_swaps_successful;
@@ -626,7 +480,7 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     if (this_global_proc == 0) {
       printf("\n");
       printf("---------------------------------------------------------------\n");
-      printf("Total wall time for COORDX:     %.4f seconds\n", TotalLoopTime);
+      printf("Total wall time for COLVARX:    %.4f seconds\n", TotalLoopTime);
       printf("Mean wall time b/w swaps:       %.4f seconds\n", TotalLoopTime / (double)(i_nswaps));
       printf("Mean acceptance ratio:          %.3f \n", average_acceptance_ratio / (double)(i_nswaps));
       printf("Total swaps attempted:          %d\n", n_total_swaps_attempted);
@@ -652,13 +506,7 @@ void coord_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     free(world2replicaid);
     free(replicaid2world);
     free(world2temp);
-    free(my_coords);
-    free(partner_coords);
-    free(my_velocs);
-    free(partner_velocs);
-    free(my_images);
-    free(partner_images);
-    free(my_mask);
-    free(partner_mask);
 
+    free(my_out_filename);
+    free(partner_out_filename);
 }

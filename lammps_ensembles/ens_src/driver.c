@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
     
 
 /*----------------------------------------------------------------------------------
- * open file and find TEMPER or ANNEAL or COORDX initializer 
+ * open file and find TEMPER or ANNEAL or COORDX or COLVARX initializer 
  */
             
     MPI_Barrier(MPI_COMM_WORLD);
@@ -243,6 +243,7 @@ int main(int argc, char **argv) {
     int nsteps, nevery, sseed, bseed, rate;	// total run, frequency of swap, randswap seed, metropolis seed, cooling rate
     int temperflag = 0, annealflag = 0;		// RE or SA 
     int coordxflag = 0;                         // Coordinate exchange
+    int colvarxflag = 0;                        // Colvar exchange
     double temp, temp_hi, temp_lo;		// RE temp, SA high and low temp
     char fix[50], file[50];			// fix id, restart binary filename
     char CVID[50];			        // Collecvtive Variable ID 
@@ -265,7 +266,7 @@ int main(int argc, char **argv) {
 		fpos_t position;
 
 		// search for TEMPER or ANNEAL line by checking first 9 chars
-		while(temperflag == 0 && annealflag == 0 && coordxflag == 0 
+		while( (temperflag + annealflag + coordxflag + colvarxflag) == 0 
                       && !feof(infile)) {	
 			fgetpos(infile, &position);	// store position
 			fgets(command, 9, infile);	// read in 9 chars
@@ -274,6 +275,7 @@ int main(int argc, char **argv) {
 			if     (strcmp(command, "#TEMPER:") == 0) temperflag = 1;
 			else if(strcmp(command, "#ANNEAL:") == 0) annealflag = 1;
 			else if(strcmp(command, "#COORDX:") == 0) coordxflag = 1;
+			else if(strcmp(command, "#COLVARX") == 0) colvarxflag = 1;
 		}
 
 		// come back to beginning of line
@@ -317,6 +319,26 @@ int main(int argc, char **argv) {
                           }
                         }
                       }
+		} else if(colvarxflag) {
+		      fscanf(infile, "#COLVARX: fix %s seed %d", fix, &sseed);
+		      int len_fix = strlen(fix) - 1;
+		      fix[len_fix] = 0;
+                      // search for replica line for replica id
+		      while( colvarxflag == 1 && !feof(infile) ) {	
+                        int tmp1, tmp3;
+                        double tmp2;
+			fgetpos(infile, &position);	// store position
+			fgets(command, 10, infile);	// read in 10 chars
+			fscanf(infile, "\n");		// move to end of line
+			if ( strcmp(command, "#REPLICA:") == 0) { 
+		          // come back to beginning of line
+		          fsetpos(infile, &position);
+  			  if ( fscanf(infile, "#REPLICA: id %d, ndim %d, temp %lf, tdim %d", 
+                                      &replicaID, &tmp1, &tmp2, &tmp3) == 4) {
+                            colvarxflag = 2;
+                          }
+                        }
+                      }
                 }
 		
         fclose(infile);
@@ -326,6 +348,7 @@ int main(int argc, char **argv) {
     MPI_Bcast(&temperflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&annealflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&coordxflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&colvarxflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	
     MPI_Bcast(&nsteps, 1, MPI_INT, 0, subcomm);
     MPI_Bcast(&nevery, 1, MPI_INT, 0, subcomm);
@@ -376,13 +399,23 @@ int main(int argc, char **argv) {
 	    } 
             MPI_Bcast(&replicaID, 1, MPI_INT, 0, subcomm);
 
-	} else {		// could not find TEMPER or ANNEAL or COORDX 
+	} else if(colvarxflag) {
+		
+	    MPI_Bcast(&sseed, 1, MPI_INT, 0, subcomm); 
+	    if(this_global_proc == 0) {
+		printf("Preparing to run replica exchange with colvar exchange:\n");
+	        printf("---> Using fix id %s\n", fix);
+	        printf("---> Using random swap seed %d\n", sseed);
+	    } 
+            MPI_Bcast(&replicaID, 1, MPI_INT, 0, subcomm);
+
+	} else {		// could not find TEMPER or ANNEAL or COORDX or COLVARX 
 
 		if(this_global_proc == 0) {
 			printf("No multi-replica simulation specificied in input script.\n");
 			printf("Please specifiy a simulation.\n");
                         printf("Valid options are (whitespace sensitive):\n");
-                        printf("'#TEMPER: ', '#ANNEAL: ', '#COORDX: '\n"); 
+                        printf("'#TEMPER: ', '#ANNEAL: ', '#COORDX: ', '#COLVARX: '\n"); 
 			printf("Exiting.\n\n");
 			exit(1);
 		}
@@ -416,7 +449,7 @@ int main(int argc, char **argv) {
     //  // New CVID labelling
     //  sprintf(str3_log,"log.cv.%s", CVID);
     //} else {
-    if (coordxflag) {
+    if (coordxflag || colvarxflag) {
       sprintf(str3_log,"log.id.%d", replicaID);
     } else {
       // Default to split key labelling
@@ -519,7 +552,7 @@ int main(int argc, char **argv) {
     	  printf("---> Beginning simulated annealing...\n\n");
 //		anneal(lmp, subcomm, file, fix, bseed, split_key, n_comms, nsteps, nevery, rate, temp_hi, temp_lo);
     }
-    else if(coordxflag) {
+    else if(coordxflag || colvarxflag) {
  
         // ** Set up the replica data structure here ** //
         Replica this_replica;
@@ -530,10 +563,12 @@ int main(int argc, char **argv) {
         }
 
     	if (this_global_proc == 0) 
-    	    printf("---> Beginning replica exchange with coordinates...\n\n"); 
+    	    printf("---> Beginning replica exchange...\n\n"); 
 
-        if (!skip_run)
-          coord_exchange(lmp, subcomm, n_comms, split_key, &this_replica, fix, sseed); 
+        if (!skip_run) {
+           if (coordxflag)  coord_exchange(lmp, subcomm, n_comms, split_key, &this_replica, fix, sseed); 
+           if (colvarxflag) colvar_exchange(lmp, subcomm, n_comms, split_key, &this_replica, fix, sseed); 
+        }
 
         // ** Free replica array ** //
         free(this_replica.neighbors);

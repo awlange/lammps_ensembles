@@ -70,9 +70,11 @@ double rng2();
 void   anneal(void *, MPI_Comm, char *, char *, int, int, int, int, int, int, double, double);
 char   *command_generate(char *, int);
 
+double get_bias(void *, char *, int);
 void ReadInputFiles(int*, char **, int, int, int *, int *, int *, char *);
 void ReadReplica(Replica *, MPI_Comm, int, int, char *);
 void coord_exchange(void *, MPI_Comm, int, int, Replica *, char *, int);
+void colvar_exchange(void *, MPI_Comm, int, int, Replica *, char *, int);
 
 
 
