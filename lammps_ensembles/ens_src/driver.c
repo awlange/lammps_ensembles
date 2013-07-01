@@ -538,7 +538,8 @@ int main(int argc, char **argv) {
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    int skip_run = 0;
+    int skip_run = 0; // debugging
+
     // run simulation
     if(temperflag) {
     	if (this_global_proc == 0) 
@@ -550,7 +551,7 @@ int main(int argc, char **argv) {
     else if(annealflag) {
        	if(this_global_proc == 0)
     	  printf("---> Beginning simulated annealing...\n\n");
-//		anneal(lmp, subcomm, file, fix, bseed, split_key, n_comms, nsteps, nevery, rate, temp_hi, temp_lo);
+        //anneal(lmp, subcomm, file, fix, bseed, split_key, n_comms, nsteps, nevery, rate, temp_hi, temp_lo);
     }
     else if(coordxflag || colvarxflag) {
  

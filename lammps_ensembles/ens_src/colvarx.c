@@ -236,8 +236,8 @@ void colvar_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     // colvar data: 0 = force_k, 1 = colvar_center
     double my_colvar_data[2];
     double partner_colvar_data[2]; 
-    char *my_out_filename      = (char *)malloc(sizeof(char) * 256);
-    char *partner_out_filename = (char *)malloc(sizeof(char) * 256);
+    char *my_out_filename      = (char *)malloc(sizeof(char) * MAXCHARS);
+    char *partner_out_filename = (char *)malloc(sizeof(char) * MAXCHARS);
  
 
     int n_swap_runs_completed = 0;
@@ -336,8 +336,8 @@ void colvar_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
             // Communicate
             MPI_Sendrecv(my_colvar_data,      2, MPI_DOUBLE, partner_proc, 0,
                          partner_colvar_data, 2, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
-            MPI_Sendrecv(my_out_filename,      256, MPI_CHAR, partner_proc, 1,
-                         partner_out_filename, 256, MPI_CHAR, partner_proc, 1, MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(my_out_filename,      MAXCHARS, MPI_CHAR, partner_proc, 1,
+                         partner_out_filename, MAXCHARS, MPI_CHAR, partner_proc, 1, MPI_COMM_WORLD, &status);
             // Set my center to partner's
             lammps_modify_colvar(lmp, fix, 1, partner_colvar_data, NULL);
             // Set output file name to partner's
@@ -414,7 +414,7 @@ void colvar_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
           // nothing more to do since colvar data exchanged above already.
         }
         else if (swap == 0 && partner_proc != -1) {
-          // Coordinates were swapped above in attempt but exchange failed. So, restore my colvar data. 
+          // Info was swapped above in attempt but exchange failed. So, restore my data. 
 	  if (this_local_proc == 0) {
             lammps_modify_colvar(lmp, fix, 1, my_colvar_data, NULL);
             lammps_modify_colvar(lmp, fix, 5, NULL, my_out_filename);

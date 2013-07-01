@@ -27,7 +27,6 @@
 #include "library.h"
 #include "replica.h"
 
-#define MAXCHARS 256
 
 void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms, 
             int comm, double temp, char* fix, int sseed, int dump_swap) {

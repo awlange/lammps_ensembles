@@ -31,6 +31,7 @@
 #define __REPLICA_H__
 
 #define MAX_FILE_LEN 100
+#define MAXCHARS 256
 
 // LAMMPS data type for timestep, may need to adjust manually to 32-bit for machine dependence
 #include <inttypes.h>
