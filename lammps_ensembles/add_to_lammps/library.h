@@ -57,6 +57,10 @@ void lammps_set_map_array(void *, int *, int);
 void lammps_get_atom_x_v_i(void *, double *, double *, int *, int *);
 void lammps_set_atom_x_v_i(void *, double *, double *, int *, int *);
 
+void   lammps_write_restart(void*, char**, int);
+double lammps_extract_EVB_data(void *, char *, int, int);
+void   lammps_modify_EVB_data(void *, char *, int, double *);
+
 #ifdef __cplusplus
 }
 #endif

@@ -43,6 +43,8 @@
 #include "dump.h"
 #include "fix_colvars.h"
 #include "colvarproxy_lammps.h"
+#include "write_restart.h"
+
 
 using namespace LAMMPS_NS;
 
@@ -654,6 +656,7 @@ void lammps_mod_inst(void *ptr, int type, char *id, char *command, void *arg) {
 
 }
 
+/* ---------------------------------------------------------------------- */
 
 void lammps_scale_velocities(void *ptr, double my_temp, double p_temp) {
 
@@ -683,6 +686,8 @@ char *lammps_get_dump_file(void *ptr) {
    return NULL;
 }
 
+/* ---------------------------------------------------------------------- */
+
 void lammps_change_dump_file(void *ptr, int comm, char *new_filename) {
 
    LAMMPS *lmp = (LAMMPS *)ptr;
@@ -697,6 +702,7 @@ void lammps_change_dump_file(void *ptr, int comm, char *new_filename) {
    }
 }
 
+/* ---------------------------------------------------------------------- */
 /*  colvar exchange stuff */
 void lammps_modify_colvar(void *ptr, char *id, int which, double *var, char *filename)
 {
@@ -712,16 +718,17 @@ void lammps_modify_colvar(void *ptr, char *id, int which, double *var, char *fil
 
 /* Attempting to fix the mapping schtuff */
 
+/* ---------------------------------------------------------------------- */
 int *lammps_get_map_array(void *ptr) {
     LAMMPS *lmp = (LAMMPS *)ptr;
     return lmp->atom->get_map_array();
 }
-
+/* ---------------------------------------------------------------------- */
 int lammps_get_map_size(void *ptr) {
     LAMMPS *lmp = (LAMMPS *)ptr;
     return lmp->atom->get_map_size();
 }
-
+/* ---------------------------------------------------------------------- */
 void lammps_set_map_array(void *ptr, int *new_map, int new_nlocal) {
     LAMMPS *lmp = (LAMMPS *)ptr;
     lmp->atom->nlocal = new_nlocal;
@@ -733,6 +740,7 @@ void lammps_set_map_array(void *ptr, int *new_map, int new_nlocal) {
     //}    
 }
 
+/* ---------------------------------------------------------------------- */
 void lammps_get_atom_x_v_i(void *ptr, double *xout, double *vout, tagint *iout, int *maskout) {
     LAMMPS *lmp = (LAMMPS *)ptr;
     double **x = lmp->atom->x;
@@ -751,6 +759,7 @@ void lammps_get_atom_x_v_i(void *ptr, double *xout, double *vout, tagint *iout, 
       maskout[i]    = mask[i];
     }
 }
+/* ---------------------------------------------------------------------- */
 void lammps_set_atom_x_v_i(void *ptr, double *xin, double *vin, tagint *iin, int *maskin) {
     LAMMPS *lmp = (LAMMPS *)ptr;
     double **x = lmp->atom->x;
@@ -768,4 +777,46 @@ void lammps_set_atom_x_v_i(void *ptr, double *xin, double *vin, tagint *iin, int
       im[i]   = iin[i];
       mask[i] = maskin[i];
     }
+}
+
+/* ---------------------------------------------------------------------- */
+
+void lammps_write_restart(void *ptr, char** filename, int timestep)
+{
+  LAMMPS *lmp = (LAMMPS *)ptr;
+  WriteRestart write_restart(lmp);
+  lmp->update->ntimestep = timestep;
+  write_restart.command(1,filename);
+}
+/* ---------------------------------------------------------------------- */
+// ** AWGL : For retreving/modifying fix EVB data ** //
+
+double lammps_extract_EVB_data(void * ptr, char * id, int type1, int type2)
+{
+  LAMMPS *lmp = (LAMMPS *)ptr;
+
+  int ifix = lmp->modify->find_fix(id);
+  if (ifix < 0) lmp->error->all(FLERR, "Cannot find the fix for EVB.");
+  Fix *fix = lmp->modify->fix[ifix];
+
+  if      (type1 == -1) return fix->compute_scalar(); // EVB energy
+  else if (type1 >=  0) return fix->compute_array(type1, type2); // Others
+  else lmp->error->all(FLERR, "Invalid requested type for extracting EVB data.");
+
+  return 0.0;
+}
+
+
+/* ---------------------------------------------------------------------- */
+
+void lammps_modify_EVB_data(void * ptr, char * id, int type, double * input)
+{
+  LAMMPS *lmp = (LAMMPS *)ptr;
+
+  int ifix = lmp->modify->find_fix(id);
+  if (ifix < 0) lmp->error->all(FLERR, "Cannot find the fix for EVB.");
+  Fix *fix = lmp->modify->fix[ifix];
+
+  if (type < 1) lmp->error->all(FLERR, "Invalid requested type for modifying EVB data.");
+  else fix->modify_fix(type, input, NULL);
 }

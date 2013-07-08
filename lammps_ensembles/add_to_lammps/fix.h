@@ -166,8 +166,9 @@ class Fix : protected Pointers {
   virtual unsigned int data_mask() {return datamask;}
   virtual unsigned int data_mask_ext() {return datamask_ext;}
 
-  // awgl: to allox LAMMPS ensembles to modify colvars fix
+  // awgl: to allow LAMMPS ensembles to modify fix, other functions
   virtual void modify_fix(int, double *, char *) {return;} ;
+  virtual void compute_bias_stuff_for_external(double*, double*, double*) {}
 
  protected:
   int evflag;

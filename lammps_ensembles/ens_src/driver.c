@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
     
 
 /*----------------------------------------------------------------------------------
- * open file and find TEMPER or ANNEAL or COORDX or COLVARX initializer 
+ * open file and find TEMPER, ANNEAL, COORDX, COLVARX, RELAMB initializer 
  */
             
     MPI_Barrier(MPI_COMM_WORLD);
@@ -244,11 +244,13 @@ int main(int argc, char **argv) {
     int temperflag = 0, annealflag = 0;		// RE or SA 
     int coordxflag = 0;                         // Coordinate exchange
     int colvarxflag = 0;                        // Colvar exchange
+    int relambdaflag = 0;                       // Lambda scalinge exchange for RAPTOR
     double temp, temp_hi, temp_lo;		// RE temp, SA high and low temp
     char fix[50], file[50];			// fix id, restart binary filename
     char CVID[50];			        // Collecvtive Variable ID 
     int replicaID = -1;                         // replica ID for coordx
     int dump_swap = 0;                          // swap dump file names in temper
+    double lambda = 0.0;                        // scaling scalar
 
 
     // doing everything on root of subcomms
@@ -266,7 +268,7 @@ int main(int argc, char **argv) {
 		fpos_t position;
 
 		// search for TEMPER or ANNEAL line by checking first 9 chars
-		while( (temperflag + annealflag + coordxflag + colvarxflag) == 0 
+		while( (temperflag + annealflag + coordxflag + colvarxflag + relambdaflag) == 0 
                       && !feof(infile)) {	
 			fgetpos(infile, &position);	// store position
 			fgets(command, 9, infile);	// read in 9 chars
@@ -276,6 +278,7 @@ int main(int argc, char **argv) {
 			else if(strcmp(command, "#ANNEAL:") == 0) annealflag = 1;
 			else if(strcmp(command, "#COORDX:") == 0) coordxflag = 1;
 			else if(strcmp(command, "#COLVARX") == 0) colvarxflag = 1;
+			else if(strcmp(command, "#RELAMB:") == 0) relambdaflag = 1;
 		}
 
 		// come back to beginning of line
@@ -339,6 +342,22 @@ int main(int argc, char **argv) {
                           }
                         }
                       }
+                } else if(relambdaflag) {
+                        int n = fscanf(infile, "#RELAMB: LID %s", CVID);
+                        n += fscanf(infile, " run %d, swap %d, temp %lf, fix %s",
+                                       &nsteps, &nevery, &temp, fix);
+                        n += fscanf(infile, " seed %d, lambda %lf",
+                                       &sseed, &lambda);
+                        if (n != 7) {
+                          printf("Problem reading #RELAMB line on subcomm %d.\n", gproc_lcomm[this_global_proc]);
+                          printf("Wrong number of input fields. Please check that formatting strictly complies.\n");
+                          exit(1);
+                        }
+                        int len = strlen(fix) - 1;
+                        fix[len] = 0;
+                        len = strlen(CVID) - 1;
+                        CVID[len] = 0;
+                        bseed = 0; // not used by RELAMBDA, we only need one seed
                 }
 		
         fclose(infile);
@@ -349,6 +368,7 @@ int main(int argc, char **argv) {
     MPI_Bcast(&annealflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&coordxflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&colvarxflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&relambdaflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	
     MPI_Bcast(&nsteps, 1, MPI_INT, 0, subcomm);
     MPI_Bcast(&nevery, 1, MPI_INT, 0, subcomm);
@@ -409,13 +429,30 @@ int main(int argc, char **argv) {
 	    } 
             MPI_Bcast(&replicaID, 1, MPI_INT, 0, subcomm);
 
-	} else {		// could not find TEMPER or ANNEAL or COORDX or COLVARX 
+        } else if(relambdaflag) {
 
+            MPI_Bcast(CVID, 50, MPI_CHAR, 0, subcomm);
+            MPI_Bcast(&sseed, 1, MPI_INT, 0, subcomm);
+            MPI_Bcast(&temp, 1, MPI_DOUBLE, 0, subcomm);
+            MPI_Bcast(&lambda, 1, MPI_DOUBLE, 0, subcomm);
+            if(this_global_proc == 0) {
+                printf("Preparing to run replica exchange lambda simulation:\n");
+                printf("---> Run %d total timesteps\n", nsteps);
+                printf("---> Attempt exchange every %d timesteps\n", nevery);
+                printf("---> Using fix id %s\n", fix);
+                printf("---> Using random seed %d\n", sseed);
+            }
+            if (this_local_proc == 0) {
+                printf("---> Subcomm %d will use %s as its LID\n", gproc_lcomm[this_global_proc], CVID);
+            }
+
+	} else {		
+                // could not find tag 
 		if(this_global_proc == 0) {
 			printf("No multi-replica simulation specificied in input script.\n");
 			printf("Please specifiy a simulation.\n");
                         printf("Valid options are (whitespace sensitive):\n");
-                        printf("'#TEMPER: ', '#ANNEAL: ', '#COORDX: ', '#COLVARX: '\n"); 
+                        printf("'#TEMPER: ', '#ANNEAL: ', '#COORDX: ', '#COLVARX: ', '#RELAMB: '\n"); 
 			printf("Exiting.\n\n");
 			exit(1);
 		}
@@ -575,6 +612,12 @@ int main(int argc, char **argv) {
         free(this_replica.neighbors);
         free(this_replica.dim_run);
         free(this_replica.dim_nevery);
+    }
+    else if(relambdaflag) {
+        if (this_global_proc == 0)
+            printf("---> Beginning replica exchange lambda simulation at temperature %f \n", temp);
+
+       relambda(lmp, subcomm, CVID, nsteps, nevery, n_comms, split_key, temp, fix, sseed, lambda);
     }
 
 /*----------------------------------------------------------------------------------

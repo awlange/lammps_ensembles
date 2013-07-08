@@ -6,7 +6,7 @@
 CC = mpicc
 
 # point to LAMMPS source directory where library has been compiled (don't leave space at end!)
-LAMMPSDIR = /Users/alange/research/lammps_ensembles/LE_070113/lammps-9Mar13
+LAMMPSDIR = /Users/alange/research/lammps_ensembles/LE_070813/lammps-9Mar13
 LAMMPSSRC = $(LAMMPSDIR)/src
 
 # External library paths and identifiers
@@ -17,9 +17,8 @@ LIBDIR =
 LIB = -llammps_mac_awgl -L$(LIBCOLVARS) -lcolvars 
 
 # Debugging flags
-DEBUG = -g -DCOORDX_DEBUG 
-#DEBUG = -g -DCOORDX_DEBUG -DCOORDX_DEBUG_LEVEL_TWO
-#DEBUG = -g
+#DEBUG = -g -DRELAMBDA_DEBUG 
+DEBUG = -g
 
 # Compiler flags, optimizations
 CCFLAGS = -O3 -fopenmp $(DEBUG) -I$(LAMMPSSRC) 

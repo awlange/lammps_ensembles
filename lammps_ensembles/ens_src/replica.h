@@ -51,7 +51,7 @@ typedef struct {
   int N_dimensions;     // Number of dimensions this replica can exchange along
   double temperature;   // Temperature of this replica
   int temp_dim;         // Dimension for temperature exchange
-  int scale_dim;        // Dimension for scaling exchange
+  int scale_dim;        // Dimension for scaling exchange (i.e. lambda exchange)
   int *neighbors;       // List of neighbors in each dimension. Restricted to 2 neighbors (+ and -)
   int *dim_num;         // Dimension index for each dimension, starts at 0 
   int *dim_run;         // How long to run for each dimension
@@ -76,6 +76,7 @@ void ReadInputFiles(int*, char **, int, int, int *, int *, int *, char *);
 void ReadReplica(Replica *, MPI_Comm, int, int, char *);
 void coord_exchange(void *, MPI_Comm, int, int, Replica *, char *, int);
 void colvar_exchange(void *, MPI_Comm, int, int, Replica *, char *, int);
+void relambda(void *, MPI_Comm, char*, int, int, int, int, double, char*, int, double);
 
 
 
