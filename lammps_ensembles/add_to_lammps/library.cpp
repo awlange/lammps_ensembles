@@ -867,6 +867,5 @@ void lammps_modify_umbrella_data(void * ptr, char * id, int type, double * input
   Fix *fix = lmp->modify->fix[ifix];
 
   if (type < 1) lmp->error->all(FLERR, "Invalid requested type for modifying umbrella data.");
-  //else fix->modify_variable(type, input);
   else fix->modify_fix(type, input, NULL); 
 }

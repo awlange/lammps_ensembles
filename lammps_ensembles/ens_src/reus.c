@@ -208,7 +208,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
     double beta = 1.0 / (boltz * i_temp);
 
     // Grab umbrella data
-    get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save);
+    get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
 
 #ifdef REUS_DEBUG
     if (i_comm == 0 && this_proc == 0) {
@@ -309,7 +309,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
           current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
           timestep = *current_ptr;
           if (timestep % i_dump == 0) {
-            get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save);
+            get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
             if (this_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
           }
         }
@@ -320,7 +320,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
           lammps_mod_inst(lmp, 3, NULL, "run", &i_dump);
           current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
           timestep = *current_ptr;
-          get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save);
+          get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
           if (this_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
         } 
 
@@ -349,7 +349,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
             current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
             timestep = *current_ptr;
             if (timestep % i_dump == 0) {
-              get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save);
+              get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
               if (this_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
             }
             if (this_proc == 0) MPI_Test(&all_fin_req, &test_flag, &status1);
@@ -400,7 +400,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
             current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
             timestep = *current_ptr;
             if (timestep % i_dump == 0) {
-              get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save);
+              get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
               if(this_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
             }
 
@@ -443,7 +443,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
         // *** MPI_COMM_WORLD is now synced *** //
 
         // 5. extract current bias information of this instance 
-        get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save);
+        get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
   
         // 6. figure out if swap is okay
         double buffer[12];
@@ -599,6 +599,11 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
             after[2] = lammps_extract_umbrella_data(lmp, fix, 4, 2);
             printf("Replica %d xa0: before = %f %f %f after = %f %f %f\n", i_comm, 
                     bias_xa0[0], bias_xa0[1], bias_xa0[2], after[0], after[1], after[2]);
+            after[0] = lammps_extract_umbrella_data(lmp, fix, 1, 0);
+            after[1] = lammps_extract_umbrella_data(lmp, fix, 1, 1);
+            after[2] = lammps_extract_umbrella_data(lmp, fix, 1, 2);
+            printf("Replica %d ref: before = %f %f %f after = %f %f %f\n", i_comm, 
+                    bias_ref[0], bias_ref[1], bias_ref[2], after[0], after[1], after[2]);
 #endif
             // reset temp_id
             i_temp_id = p_temp_id;
@@ -749,24 +754,44 @@ void write_to_colvar_vec(bigint timestep, double* dx, double h, double bias_v, i
  * Helper function to extract data about the umbrella sampling 
  */
 void get_umbrella_data(void* lmp, char* fix, double* bias_dx, double* bias_ref, double* bias_kappa, 
-                       double* bias_xa0, double* bias_v, double* h_save) 
+                       double* bias_xa0, double* bias_v, double* h_save, int coordtype) 
 {
-  bias_dx[0]    = lammps_extract_umbrella_data(lmp, fix, 0, 0);
-  bias_dx[1]    = lammps_extract_umbrella_data(lmp, fix, 0, 1);
-  bias_dx[2]    = lammps_extract_umbrella_data(lmp, fix, 0, 2);
-  bias_ref[0]   = lammps_extract_umbrella_data(lmp, fix, 1, 0);
-  bias_ref[1]   = lammps_extract_umbrella_data(lmp, fix, 1, 1);
-  bias_ref[2]   = lammps_extract_umbrella_data(lmp, fix, 1, 2);
-  bias_kappa[0] = lammps_extract_umbrella_data(lmp, fix, 2, 0);
-  bias_kappa[1] = lammps_extract_umbrella_data(lmp, fix, 2, 1);
-  //bias_kappa[2] = lammps_extract_umbrella_data(lmp, fix, 2, 2); // don't need this one for now
-  bias_kappa[2] = 0.0; 
-  bias_xa0[0]   = lammps_extract_umbrella_data(lmp, fix, 4, 0);
-  bias_xa0[1]   = lammps_extract_umbrella_data(lmp, fix, 4, 1);
-  bias_xa0[2]   = lammps_extract_umbrella_data(lmp, fix, 4, 2);
-  // Have to re-compute bias energy here...
-  lammps_compute_bias_stuff_for_external(lmp, fix, bias_kappa, bias_ref, bias_xa0);
-  *bias_v = lammps_extract_umbrella_data(lmp, fix, -1, 0); 
-  // Also want this for writing to file
-  *h_save = lammps_extract_umbrella_data(lmp, fix,  3, 0);
+  if (coordtype == COORD_CART) {
+    bias_dx[0]    = lammps_extract_umbrella_data(lmp, fix, 0, 0);
+    bias_dx[1]    = lammps_extract_umbrella_data(lmp, fix, 0, 1);
+    bias_dx[2]    = lammps_extract_umbrella_data(lmp, fix, 0, 2);
+    bias_ref[0]   = lammps_extract_umbrella_data(lmp, fix, 1, 0);
+    bias_ref[1]   = lammps_extract_umbrella_data(lmp, fix, 1, 1);
+    bias_ref[2]   = lammps_extract_umbrella_data(lmp, fix, 1, 2);
+    bias_kappa[0] = lammps_extract_umbrella_data(lmp, fix, 2, 0);
+    bias_kappa[1] = lammps_extract_umbrella_data(lmp, fix, 2, 1);
+    bias_kappa[2] = lammps_extract_umbrella_data(lmp, fix, 2, 2);
+    bias_xa0[0]   = lammps_extract_umbrella_data(lmp, fix, 4, 0);
+    bias_xa0[1]   = lammps_extract_umbrella_data(lmp, fix, 4, 1);
+    bias_xa0[2]   = lammps_extract_umbrella_data(lmp, fix, 4, 2);
+    // Have to re-compute bias energy here...
+    lammps_compute_bias_stuff_for_external(lmp, fix, bias_kappa, bias_ref, bias_xa0);
+    *bias_v = lammps_extract_umbrella_data(lmp, fix, -1, 0); 
+    *h_save = 0.0;
+  }
+  else if (coordtype == COORD_CYLINDER) {
+    bias_dx[0]    = lammps_extract_umbrella_data(lmp, fix, 0, 0);
+    bias_dx[1]    = lammps_extract_umbrella_data(lmp, fix, 0, 1);
+    bias_dx[2]    = lammps_extract_umbrella_data(lmp, fix, 0, 2);
+    bias_ref[0]   = lammps_extract_umbrella_data(lmp, fix, 1, 0);
+    bias_ref[1]   = lammps_extract_umbrella_data(lmp, fix, 1, 1);
+    bias_ref[2]   = lammps_extract_umbrella_data(lmp, fix, 1, 2);
+    bias_kappa[0] = lammps_extract_umbrella_data(lmp, fix, 2, 0);
+    bias_kappa[1] = lammps_extract_umbrella_data(lmp, fix, 2, 1);
+    //bias_kappa[2] = lammps_extract_umbrella_data(lmp, fix, 2, 2); // don't need this one for now
+    bias_kappa[2] = 0.0; 
+    bias_xa0[0]   = lammps_extract_umbrella_data(lmp, fix, 4, 0);
+    bias_xa0[1]   = lammps_extract_umbrella_data(lmp, fix, 4, 1);
+    bias_xa0[2]   = lammps_extract_umbrella_data(lmp, fix, 4, 2);
+    // Have to re-compute bias energy here...
+    lammps_compute_bias_stuff_for_external(lmp, fix, bias_kappa, bias_ref, bias_xa0);
+    *bias_v = lammps_extract_umbrella_data(lmp, fix, -1, 0); 
+    // Also want this for writing to file
+    *h_save = lammps_extract_umbrella_data(lmp, fix,  3, 0);
+  }
 }

@@ -420,6 +420,8 @@ void FixUmbrella::compute()
     double h = 0.0;
     for(int i=0; i<3; i++) h+=dx[i]*ref[i];
     energy += 0.5*k[0]*h*h;
+    // AWGL
+    h_save = h; // save for extraction
 
     double dh[3],fh[3];
     for(int i=0; i<3; i++) 
@@ -647,7 +649,7 @@ void FixUmbrella::write_log()
 /* AWGL : Additional functions for REUS external driver interface         */
 /* ---------------------------------------------------------------------- */
 
-void FixUmbrella::compute_bias_stuff_for_external(double * k_mod, double * ref_mod, double* xa0_mod)
+void FixUmbrella::compute_bias_stuff_for_external(double *k_mod, double *ref_mod, double *xa0_mod)
 {
   // ** This is a simplified version of compute intended for use with
   //    the REUS external driver ** //
@@ -688,8 +690,33 @@ void FixUmbrella::compute_bias_stuff_for_external(double * k_mod, double * ref_m
   dx[0] = dx[1] = dx[2] = 0.0;
 
   /******************************************/
-  //if(coord==COORD_CYLINDER)
-  //{ 
+  if(coord==COORD_CART) 
+  {
+    //for(int i=0; i<3; i++) if (di[i]) dx[i] = x[0][i]-x[1][i];
+    for(int i=0; i<3; i++) if (di[i]) dx[i] = x[0][i]-xa0_mod[i];
+    VECTOR_PBC(dx);
+    //for(int i=0; i<3; i++) if (di[i]) dx[i] = dx[i]-ref[i];
+    for(int i=0; i<3; i++) if (di[i]) dx[i] = dx[i]-ref_mod[i];
+    VECTOR_PBC(dx);
+	
+    for(int i=0; i<3; i++) if (di[i])
+    {
+	  //ff[i] = -k[i];
+	  ff[i] = -k_mod[i];
+	  //f[0][i] = - k[i] * dx[i]; f[1][i] = -f[0][i];
+	  f[0][i] = - k_mod[i] * dx[i]; f[1][i] = -f[0][i];
+	  dx2[i] = dx[i]*dx[i];
+	  //bias_energy += 0.5 * k[i] * dx2[i];
+	  bias_energy += 0.5 * k_mod[i] * dx2[i];
+    }
+
+    //for(int i=0; i<3; i++) if (di[i]) dx[i] = x[0][i]-x[1][i];
+    for(int i=0; i<3; i++) if (di[i]) dx[i] = x[0][i]-xa0_mod[i];
+    VECTOR_PBC(dx);
+  }
+  /******************************************/
+  if(coord==COORD_CYLINDER)
+  { 
     int a0, a1;
     if(type_grp[0]==GTP_COORD) { a0=0; a1=1; }
     else { a1=0; a0=1; }
@@ -720,7 +747,7 @@ void FixUmbrella::compute_bias_stuff_for_external(double * k_mod, double * ref_m
     dr[2] = dx[2] - dh[2];
     double r = dr[0]*dr[0] + dr[1]*dr[1] + dr[2]*dr[2];
     bias_energy += 0.5*k_mod[1]*r;
-  //}
+  }
   /******************************************/
 
 }
@@ -753,7 +780,7 @@ double FixUmbrella::compute_array(int i, int j)
 
 /* ---------------------------------------------------------------------- */
 
-void FixUmbrella::modify_fix(int which, double * values, char * notused)
+void FixUmbrella::modify_fix(int which, double *values, char *notused)
 {
   // Sets a specified variable to the input value(s)
   if (which == 1) {
@@ -764,6 +791,7 @@ void FixUmbrella::modify_fix(int which, double * values, char * notused)
   else if (which == 2) {
     k[0] = values[0];
     k[1] = values[1];
+    k[2] = values[2];
   }
   else if (which == 4) {
     int a0, a1;
