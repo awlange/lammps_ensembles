@@ -788,6 +788,7 @@ void lammps_write_restart(void *ptr, char** filename, int timestep)
   lmp->update->ntimestep = timestep;
   write_restart.command(1,filename);
 }
+
 /* ---------------------------------------------------------------------- */
 // ** AWGL : For retreving/modifying fix EVB data ** //
 
@@ -819,4 +820,53 @@ void lammps_modify_EVB_data(void * ptr, char * id, int type, double * input)
 
   if (type < 1) lmp->error->all(FLERR, "Invalid requested type for modifying EVB data.");
   else fix->modify_fix(type, input, NULL);
+}
+
+/* ---------------------------------------------------------------------- */
+
+void lammps_compute_bias_stuff_for_external(void * ptr, char * id, double * k_mod, double * ref_mod, double * xa0_mod)
+{
+  LAMMPS *lmp = (LAMMPS *)ptr;
+
+  int ifix = lmp->modify->find_fix(id);
+  if (ifix < 0) lmp->error->all(FLERR, "Cannot find the fix for umbrella sampling.");
+  Fix *fix = lmp->modify->fix[ifix];
+
+  // Make fix umbrella compute the bias stuff given the modified k and/or ref
+  fix->compute_bias_stuff_for_external(k_mod, ref_mod, xa0_mod);
+
+}
+
+/* ---------------------------------------------------------------------- */
+// ** AWGL : For retreving fix umbrella data ** //
+
+double lammps_extract_umbrella_data(void * ptr, char * id, int type1, int type2)
+{
+  LAMMPS *lmp = (LAMMPS *)ptr;
+
+  int ifix = lmp->modify->find_fix(id);
+  if (ifix < 0) lmp->error->all(FLERR, "Cannot find the fix for umbrella sampling.");
+  Fix *fix = lmp->modify->fix[ifix];
+
+  // ** For now, only used to extract umbrella sampling data ** //
+  if      (type1 == -1) return fix->compute_scalar();            // V_{bias}
+  else if (type1 >=  0) return fix->compute_array(type1, type2); // others 
+  else lmp->error->all(FLERR, "Invalid requested type for extracting umbrella data.");
+
+  return 0.0;
+}
+
+/* ---------------------------------------------------------------------- */
+
+void lammps_modify_umbrella_data(void * ptr, char * id, int type, double * input)
+{
+  LAMMPS *lmp = (LAMMPS *)ptr;
+
+  int ifix = lmp->modify->find_fix(id);
+  if (ifix < 0) lmp->error->all(FLERR, "Cannot find the fix for umbrella sampling.");
+  Fix *fix = lmp->modify->fix[ifix];
+
+  if (type < 1) lmp->error->all(FLERR, "Invalid requested type for modifying umbrella data.");
+  //else fix->modify_variable(type, input);
+  else fix->modify_fix(type, input, NULL); 
 }

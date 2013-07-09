@@ -43,6 +43,8 @@ int lammps_get_natoms(void *);
 void lammps_gather_atoms(void *, char *, int, int, void *);
 void lammps_scatter_atoms(void *, char *, int, int, void *);
 
+/* LAMMPS Ensembles functions */
+
 void lammps_mod_inst(void *, int, char *, char *, void *);
 void lammps_scale_velocities(void *, double, double);
 void lammps_change_dump_file(void *, int, char *);
@@ -50,7 +52,6 @@ char *lammps_get_dump_file(void *);
 
 void lammps_modify_colvar(void *, char *, int, double *, char *);
 
-/* Mapping stuff */
 int *lammps_get_map_array(void *ptr);
 int lammps_get_map_size(void *ptr);
 void lammps_set_map_array(void *, int *, int);
@@ -60,6 +61,10 @@ void lammps_set_atom_x_v_i(void *, double *, double *, int *, int *);
 void   lammps_write_restart(void*, char**, int);
 double lammps_extract_EVB_data(void *, char *, int, int);
 void   lammps_modify_EVB_data(void *, char *, int, double *);
+
+void   lammps_compute_bias_stuff_for_external(void *, char *, double *, double *, double *);
+double lammps_extract_umbrella_data(void *, char *, int, int);
+void   lammps_modify_umbrella_data(void *, char *, int, double *);
 
 #ifdef __cplusplus
 }
