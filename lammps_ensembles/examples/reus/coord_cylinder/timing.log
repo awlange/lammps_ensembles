@@ -1,0 +1,21 @@
+Total elapsed time is 286.6
+
+            Time        Count   Subroutine
+============================================================
+           202.8         1001   EVB_Engine::compute
+            38.3        21256   EVB_Engine::compute__Eii_compute_diagonal
+             1.8         1001   EVB_Engine::compute__Eii_compute_diagonal__pivot
+            39.1        21256   EVB_Engine::compute__Eii_evb_kspace_compute_cplx
+             1.8         1001   EVB_Engine::compute__Eii_evb_kspace_compute_cplx__pivot
+             9.1         1001   EVB_Engine::compute__Env_compute_diagonal
+             0.9         1001   EVB_Engine::compute__evb_kspace__compute_env
+            85.4        21256   EVB_Engine::compute__evb_offdiag__compute
+             3.7          943   EVB_Engine::compute__evb_offdiag__compute__extra
+            49.2        23258   EVB_Engine::compute_diagonal
+           207.8         1001   EVB_Engine::execute
+             0.1         1001   EVB_Engine::post_process
+             5.0         1001   EVB_Engine::pre_process
+            88.5        22199   EVB_OffDiag_PT::compute__evb_kspace_compute_exch
+            40.9        22257   EVB_PPPM::compute_cplx
+             0.9         1001   EVB_PPPM::compute_env
+            81.4        22199   EVB_PPPM::compute_exch

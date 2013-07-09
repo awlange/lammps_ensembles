@@ -1,0 +1,1276 @@
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::                                                                          ::
+::  FILE: PARAMETER FILE FOR LAMMPS_EVB                                     ::
+::                                                                          ::
+::  DATE: AUG-20-2010                                                       ::
+::                                                                          ::
+::  COMM: WATER       ---> EVB2 & EVB3                                      ::
+::        HIS         ---> EVB2                                             ::
+::                                                                          ::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+:::S                                                                      S:::
+:::S   SEGMENT:   MOLECULE TYPE (EVB KERNEL TYPE)                         S:::
+:::S                                                                      S:::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+[segment.molecule_type]
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef WAT
+
+[molecule_type.start.H3O]
+
+:      HO        2
+:      |         |
+:      OH        1
+:     / \       / \
+:   HO   HO    3   4
+           
+: number of atoms,   bonds,   angles,  dihedrals,   impropers,   starting rc
+              4        3        3         0           0          1
+: atomic information
+: atom type   charge   kernel
+  OH          -0.5      1
+  HO           0.5      1
+  HO           0.5      1
+  HO           0.5      1
+: bonds
+:  atom 1       atom 2      type
+   1            2           OH-HO
+   1            3           OH-HO
+   1            4           OH-HO
+: angles
+:  atom 1       atom 2       atom 3     type
+   2            1            3          HO-OH-HO
+   2            1            4          HO-OH-HO
+   3            1            4          HO-OH-HO
+
+: COC
+4
+1 2 3 4
+
+[molecule_type.end]
+
+: ----------------------------------------------------------------------------
+
+[molecule_type.start.H2O]
+
+: HW---OW---HW      2---1---3
+
+: number of atoms,   bonds,   angles,  dihedrals,   impropers,   starting rc
+              3        2        1         0           0          0
+: atomic information
+
+: atom type   charge   kernel
+
+  #ifdef EVB3
+  
+  OW          -0.82     1  
+  HW           0.41     1 
+  HW           0.41     1
+  
+  #endif
+  
+  #ifdef EVB2
+  
+  OW          -0.834    1  
+  HW           0.417    1 
+  HW           0.417    1
+  
+  #endif
+  
+: bonds
+:  atom 1       atom 2      type
+   1            2           OW-HW
+   1            3           OW-HW
+: angles
+:  atom 1       atom 2       atom 3     type
+   2            1            3          HW-OW-HW
+   
+[molecule_type.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef HIS
+
+[molecule_type.start.HIS-P]
+
+: number of atoms,   bonds,   angles,  dihedrals,   impropers,   starting rc
+              18         9        15          31            0          1
+
+: atomic information
+: atom type   charge 	evb_bond  
+     N        -0.3479   0	  : 1
+     H         0.2747   0	  : 2
+     CT       -0.1354   0	  : 3
+     H1        0.1212   0	  : 4
+     CT       -0.0414   0	  : 5
+     C         0.7341   0	  : 6
+     HC        0.0810   0	  : 7
+     HC        0.0810   0	  : 8
+     CC       -0.0012   1 	  : 9
+     O        -0.5894   0	  : 10
+     NA       -0.1513   1	  : 11
+     CW       -0.1141   1	  : 12
+     H         0.3866   1	  : 13
+     CR       -0.0170   1	  : 14
+     NA       -0.1718   1	  : 15
+     H4        0.2317   1	  : 16
+     H5        0.2681   1	  : 17
+     H         0.3911   1	  : 18
+	 
+: bonds
+:    atom 1 atom 2 type
+      9      11		NA-CC
+      9      12		CC-CW
+     11      13		N*-H
+     11      14		CR-NA
+     12      15		CW-NA
+     12      16		CW-H4
+     14      15		CR-NA
+     14      17		CR-H5
+     15      18		NA-H
+	 
+: angles
+:  atom 1  atom 2  atom 3  type
+     5       9      11		CT-CC-NA
+     5       9      12		CT-CC-CW
+    11       9      12		CW-CC-NA
+     9      11      13		CC-NA-H 
+     9      11      14		CC-NA-CR
+    13      11      14		CR-NA-H
+     9      12      15		CC-CW-NA
+     9      12      16		CC-CW-H4
+    15      12      16		H4-CW-NA
+    11      14      15		NA-CR-NA
+    11      14      17		H5-CR-NA
+    15      14      17		H5-CR-NA
+    12      15      14		CR-NA-CW
+    12      15      18		CW-NA-H
+    14      15      18		CR-NA-H
+	
+: dihedrals
+:  atom 1  atom 2  atom 3  atom 4  type
+	11	9	5	3	HIS_DIHEDRAL_53
+	12	9	5	3	HIS_DIHEDRAL_54
+	11	9	5	7	HIS_DIHEDRAL_55
+	12	9	5	7	HIS_DIHEDRAL_56
+	11	9	5	8	HIS_DIHEDRAL_57
+	12	9	5	8	HIS_DIHEDRAL_58
+	5	9	11	14	HIS_DIHEDRAL_59
+	5	9	11	13	HIS_DIHEDRAL_60
+	12	9	11	14	HIS_DIHEDRAL_63
+	12	9	11	13	HIS_DIHEDRAL_64
+	5	9	12	16	HIS_DIHEDRAL_61
+	5	9	12	15	HIS_DIHEDRAL_62
+	5	9	12	11	HIS_DIHEDRAL_79
+	11	9	12	16	HIS_DIHEDRAL_65
+	11	9	12	15	HIS_DIHEDRAL_66
+	15	9	12	16	HIS_DIHEDRAL_83
+	9	11	14	15	HIS_DIHEDRAL_67
+	9	11	14	17	HIS_DIHEDRAL_68
+	13	11	14	15	HIS_DIHEDRAL_69
+	13	11	14	17	HIS_DIHEDRAL_70
+	13	11	14	9	HIS_DIHEDRAL_80
+	9	12	15	14	HIS_DIHEDRAL_75
+	9	12	15	18	HIS_DIHEDRAL_77
+	16	12	15	14	HIS_DIHEDRAL_76
+	16	12	15	18	HIS_DIHEDRAL_78
+	11	14	15	18	HIS_DIHEDRAL_71
+	11	14	15	12	HIS_DIHEDRAL_72
+	12	14	15	18	HIS_DIHEDRAL_82
+	17	14	15	18	HIS_DIHEDRAL_73
+	17	14	15	12	HIS_DIHEDRAL_74
+	17	14	15	11	HIS_DIHEDRAL_81
+
+: COC information
+2 : number of COC atoms
+11 13 : index of COC atoms
+
+[molecule_type.end]
+
+: ----------------------------------------------------------------------------
+
+[molecule_type.start.HIS-E]
+
+: number of atoms,   bonds,   angles,  dihedrals,   impropers,   starting rc
+              17         8        13         26             0          0
+
+: atomic information
+: atom type   charge 	evb_bond  
+     N        -0.4157   0		: 1
+     H         0.2719   0		: 2
+     CT       -0.0581   0		: 3
+     H1        0.1360   0		: 4 
+     CT       -0.0074   0		: 5  
+     C         0.5973   0		: 6 
+     HC        0.0367   0		: 7  
+     HC        0.0367   0		: 8 
+     CC        0.1868   1 		: 9  
+     O        -0.5679   0		: 10
+     NB       -0.5432   1		: 11
+     CW       -0.2207   1		: 12
+     CR        0.1635   1		: 13
+     NA       -0.2795   1		: 14
+     H4        0.1862   1		: 15
+     H5        0.1435   1		: 16
+     H         0.3339   1		: 17
+	 
+: bonds
+:    atom 1 atom 2 type
+      9      11		CC-NB
+      9      12		CC-CW
+     11      13		CR-NB
+     12      14		CW-NA
+     12      15		CW-H4
+     13      14		CR-NA
+     13      16		CR-H5
+     14      17		NA-H
+	 
+: angles
+:  atom 1  atom 2  atom 3  type
+     5       9      11		CT-CC-NB
+     5       9      12		CT-CC-CW
+    11       9      12		CW-CC-NB
+     9      11      13		CC-NB-CR
+     9      12      14		CC-CW-NA
+     9      12      15		CC-CW-H4
+    14      12      15		H4-CW-NA
+    11      13      14		NA-CR-NB
+    11      13      16		H5-CR-NB
+    14      13      16		H5-CR-NA
+    12      14      13		CR-NA-CW
+    12      14      17		CW-NA-H
+    13      14      17		CR-NA-H
+	
+: dihedrals
+:  atom 1  atom 2  atom 3  atom 4  type
+	11	9	5	3	HIS_DIHEDRAL_84
+	12	9	5	3	HIS_DIHEDRAL_85
+	11	9	5	7	HIS_DIHEDRAL_86
+	11	9	5	8	HIS_DIHEDRAL_87
+	12	9	5	7	HIS_DIHEDRAL_88
+	12	9	5	8	HIS_DIHEDRAL_89
+	5	9	11	13	HIS_DIHEDRAL_90
+	5	9	12	15	HIS_DIHEDRAL_91
+	5	9	12	14	HIS_DIHEDRAL_92
+	11	9	12	15	HIS_DIHEDRAL_93
+	11	9	12	14	HIS_DIHEDRAL_94
+	14	9	12	15	HIS_DIHEDRAL_95
+	12	9	11	13	HIS_DIHEDRAL_96
+	9	11	13	14	HIS_DIHEDRAL_97
+	9	11	13	16	HIS_DIHEDRAL_98
+	11	13	14	17	HIS_DIHEDRAL_99
+	11	13	14	12	HIS_DIHEDRAL_100
+	12	13	14	17	HIS_DIHEDRAL_101
+	16	13	14	11	HIS_DIHEDRAL_102
+	16	13	14	12	HIS_DIHEDRAL_103
+	16	13	14	17	HIS_DIHEDRAL_104
+	9	12	14	13	HIS_DIHEDRAL_105
+	15	12	14	13	HIS_DIHEDRAL_106
+	5	9	12	11	HIS_DIHEDRAL_107
+	9	12	14	17	HIS_DIHEDRAL_108
+	15	12	14	17	HIS_DIHEDRAL_109
+
+[molecule_type.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef GLU
+
+[molecule_type.start.GLU-P]
+
+: number of atoms,   bonds,   angles,  dihedrals,   impropers,   starting rc
+              16         6        10          21            0          1
+
+: atomic information
+: atom type   charge 	evb_bond  
+     N        -0.6620   0	  : 1
+     H         0.3670   0	  : 2
+     CT       -0.1380   0	  : 3
+     H1        0.0910   0	  : 4
+     CT        0.0980   0	  : 5
+     CI        0.7050   0	  : 6
+     HC        0.0490   0	  : 7
+     HC        0.0490   0	  : 8
+     CT       -0.1950   1 	  : 9
+     O        -0.5210   0	  : 10
+     HC        0.0670   1	  : 11
+     HC        0.0670   1	  : 12
+     C         0.6810   1	  : 13
+     O2       -0.5670   1	  : 14
+     O1       -0.5150   1	  : 15
+     H2        0.4240   1         : 16 
+	 
+: bonds
+:    atom 1 atom 2 type
+      9      11		CT-HC
+      9      12		CT-HC
+      9      13		C-CT
+     13      14		C-O2
+     13      15		C-O1
+     14      16		O2-H2
+	 
+: angles
+:  atom 1  atom 2  atom 3  type
+     5       9      11		CT-CT-HC
+     5       9      12		CT-CT-HC
+     5       9      13		CT-CT-C
+    11       9      12		HC-CT-HC
+    11       9      13		HC-CT-C 
+    12       9      13		HC-CT-C 
+     9      13      14		CT-C-O2
+     9      13      15		CT-C-O1
+    14      13      15		O2-C-O1
+    13      14      16		C-O2-H2
+	
+: dihedrals
+:  atom 1  atom 2  atom 3  atom 4  type
+	3	5	9	11	GLU_DIHEDRAL_53
+	3	5	9	12	GLU_DIHEDRAL_54
+	7	5	9	11	GLU_DIHEDRAL_55
+	7	5	9	12	GLU_DIHEDRAL_56
+	8	5	9	11	GLU_DIHEDRAL_57
+	8	5	9	12	GLU_DIHEDRAL_58
+        3       5       9       13      GLU_DIHEDRAL_68
+        7       5       9       13      GLU_DIHEDRAL_69
+        8       5       9       13      GLU_DIHEDRAL_70
+	5	9	13	14	GLU_DIHEDRAL_59
+	5	9	13	15	GLU_DIHEDRAL_60
+	11	9	13	14	GLU_DIHEDRAL_63
+	12	9	13	14	GLU_DIHEDRAL_64
+	11	9	13	15	GLU_DIHEDRAL_10
+	11	9	13	15	GLU_DIHEDRAL_11
+	12	9	13	15	GLU_DIHEDRAL_10
+	12	9	13	15	GLU_DIHEDRAL_11
+	9	14	13	15      GLU_DIHEDRAL_79
+	9	13	14	16      GLU_DIHEDRAL_65
+	16	14	13	15      GLU_DIHEDRAL_66
+	16	14	13	15      GLU_DIHEDRAL_67
+
+: COC information
+2 : number of COC atoms
+14 16 : index of COC atoms
+
+[molecule_type.end]
+
+: ----------------------------------------------------------------------------
+
+[molecule_type.start.GLU-E]
+
+: number of atoms,   bonds,   angles,  dihedrals,   impropers,   starting rc
+              15         5        9         16             0          0
+
+: atomic information
+: atom type   charge 	evb_bond  
+     N        -0.5163   0         : 1   
+     H         0.2936   0         : 2   
+     CT        0.0397   0         : 3
+     H1        0.1105   0         : 4
+     CT        0.0560   0         : 5
+     CI        0.5366   0         : 6
+     HC       -0.0173   0         : 7
+     HC       -0.0173   0         : 8
+     CT        0.0136   1         : 9
+     O        -0.5819   0         : 10
+     HC       -0.0425   1         : 11
+     HC       -0.0425   1         : 12
+     C         0.8054   1         : 13
+     OE       -0.8188   1         : 14
+     OE       -0.8188   1         : 15
+	 
+: bonds
+:    atom 1 atom 2 type
+      9      11		CT-HC
+      9      12		CT-HC
+      9      13		C-CT
+     13      14		C-OE
+     13      15		C-OE
+	 
+: angles
+:  atom 1  atom 2  atom 3  type
+     5       9      11		CT-CT-HC
+     5       9      12		CT-CT-HC
+     5       9      13		CT-CT-C
+    11       9      12		HC-CT-HC
+    11       9      13		HC-CT-C
+    12       9      13		HC-CT-C
+     9 	    13      14          CT-C-OE
+     9 	    13      15          CT-C-OE
+    14 	    13      15          OE-C-OE
+	
+: dihedrals
+:  atom 1  atom 2  atom 3  atom 4  type
+        3       5       9       11      GLU_DIHEDRAL_53
+        3       5       9       12      GLU_DIHEDRAL_54
+        7       5       9       11      GLU_DIHEDRAL_55
+        7       5       9       12      GLU_DIHEDRAL_56
+        8       5       9       11      GLU_DIHEDRAL_57
+        8       5       9       12      GLU_DIHEDRAL_58
+        3       5       9       13      GLU_DIHEDRAL_68
+        7       5       9       13      GLU_DIHEDRAL_69
+        8       5       9       13      GLU_DIHEDRAL_70
+        5       9       13      14      GLU_DIHEDRAL_59
+        5       9       13      15      GLU_DIHEDRAL_60
+        11      9       13      14      GLU_DIHEDRAL_63
+        12      9       13      14      GLU_DIHEDRAL_64
+        11      9       13      15      GLU_DIHEDRAL_61
+        12      9       13      15      GLU_DIHEDRAL_62
+        9       15      13      14      GLU_DIHEDRAL_79
+
+[molecule_type.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+[segment.end]
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+:::S                                                                      S:::
+:::S   SEGMENT:   REACTION (REACTIONS TYPE AND PATHS)                     S:::
+:::S                                                                      S:::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+[segment.reaction]
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef WAT_WAT
+
+: ----------------------------------------------------------------------------
+
+[reaction.start.H3O_H2O]
+
+: For reaction pair 1 :  hydronium + water -> water + hydronium
+0            : is the atom moving from molecule B to molecule A,  0-forward,  1-backward
+H3O   H2O    : change of molecule A (Hydronium->Water)
+H2O   H3O    : change of molecule B (Water->Hydronium)
+3            : number of possible pathways
+
+: Pathway 1
+: A description of reaction contains three parts:
+1    3    3   : number of moving part, first part, second part
+: moving part:
+2    2           : the index 2 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to Water)
+: rest part: ( first type in the pair )
+1    1     : index 1 atom in reactant will become index 1 atom in product (OH->OW)
+3    2     : index 3 atom in reactant will become index 2 atom in product (HO->HW)
+4    3     : index 4 atom in reactant will become index 3 atom in product (OH->OW)
+: newing part: ( second type in the pair )
+1    1     : index 1 atom in reactant will become index 1 atom in product (OW->OH)
+2    3     : index 2 atom in reactant will become index 3 atom in product (HW->HO)
+3    4     : index 3 atom in reactant will become index 4 atom in product (HW->HO)
+
+: Pathway 2
+: A description of reaction contains three parts:
+1    3    3   : number of moving part, first part, second part
+: moving part:
+3    2           : the index 3 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to Water)
+: rest part: ( first type in the pair )
+1    1     : index 1 atom in reactant will become index 1 atom in product (OH->OW)
+2    2     : index 2 atom in reactant will become index 2 atom in product (HO->HW)
+4    3     : index 4 atom in reactant will become index 3 atom in product (OH->OW)
+: newing part: ( second type in the pair )
+1    1     : index 1 atom in reactant will become index 1 atom in product (OW->OH)
+2    3     : index 2 atom in reactant will become index 3 atom in product (HW->HO)
+3    4     : index 3 atom in reactant will become index 4 atom in product (HW->HO)
+
+: Pathway 3
+: A description of reaction contains three parts:
+1    3    3   : number of moving part, first part, second part
+: moving part:
+4    2           : the index 4 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to Water)
+: rest part: ( first type in the pair )
+1    1     : index 1 atom in reactant will become index 1 atom in product (OH->OW)
+2    2     : index 2 atom in reactant will become index 2 atom in product (HO->HW)
+3    3     : index 4 atom in reactant will become index 3 atom in product (OH->OW)
+: newing part: ( second type in the pair )
+1    1     : index 1 atom in reactant will become index 1 atom in product (OW->OH)
+2    3     : index 2 atom in reactant will become index 3 atom in product (HW->HO)
+3    4     : index 3 atom in reactant will become index 4 atom in product (HW->HO)
+
+[reaction.end]
+
+: ----------------------------------------------------------------------------
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef HIS_WAT  
+  
+[reaction.start.H3O_HIS-E]
+  
+0              : is the atom moving from molecule B to molecule A,  0-forward,  1-backward
+H3O    H2O     : change of molecule A (Hydronium->Water)
+HIS-E  HIS-P   : change of molecule B (HIE->HIP)
+3	       : number of possible pathways
+
+: ----------------------------------------------------------------------------
+
+: Pathway 1
+: A description of reaction contains three parts:
+1    3     17   : number of moving part, first part, second part
+: moving part:
+2    13	   : the index 3 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to HIE)
+: rest part: ( first type in the pair )
+1    1     :
+3    2     :
+4    3     : 
+: newing part: ( second type in the pair )
+1    1     : 
+2    2     : 
+3    3     : 
+4    4
+5    5
+6    6
+7    7
+8    8
+9    9
+10   10
+11   11
+12   12
+13   14
+14   15
+15   16
+16   17
+17   18
+
+: ----------------------------------------------------------------------------
+
+: Pathway 2
+: A description of reaction contains three parts:
+1    3     17   : number of moving part, first part, second part
+: moving part:
+3    13	   : the index 3 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to HIE)
+: rest part: ( first type in the pair )
+1    1     :
+2    2     :
+4    3     : 
+: newing part: ( second type in the pair )
+1    1     : 
+2    2     : 
+3    3     : 
+4    4
+5    5
+6    6
+7    7
+8    8
+9    9
+10   10
+11   11
+12   12
+13   14
+14   15
+15   16
+16   17
+17   18
+
+: ----------------------------------------------------------------------------
+
+: Pathway 3
+: A description of reaction contains three parts:
+1    3     17   : number of moving part, first part, second part
+: moving part:
+4    13	   : the index 3 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to HIE)
+: rest part: ( first type in the pair )
+1    1     :
+2    2     :
+3    3     : 
+: newing part: ( second type in the pair )
+1    1     : 
+2    2     : 
+3    3     : 
+4    4
+5    5
+6    6
+7    7
+8    8
+9    9
+10   10
+11   11
+12   12
+13   14
+14   15
+15   16
+16   17
+17   18
+  
+[reaction.end]
+
+: ----------------------------------------------------------------------------
+  
+[reaction.start.HIS-P_H2O]
+
+0                : is the atom moving from molecule B to molecule A,  0-forward,  1-backward
+HIS-P HIS-E      : change of molecule A (HIP->HIE)
+H2O   H3O        : change of molecule B (Water->Hydronium)
+1	         : number of possible pathways
+
+: ----------------------------------------------------------------------------
+
+: Pathway 1
+: A description of reaction contains three parts:
+1    17    3   : number of moving part, first part, second part
+: moving part:
+13   2	   : the index 3 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to HIE)
+: rest part: ( first type in the pair )
+1    1     : 
+2    2     : 
+3    3     : 
+4    4
+5    5
+6    6
+7    7
+8    8
+9    9
+10   10
+11   11
+12   12
+14   13
+15   14
+16   15
+17   16
+18   17
+: newing part: ( second type in the pair )
+1    1
+2    3
+3    4
+  
+  [reaction.end]
+  
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef GLU_WAT
+
+[reaction.start.H3O_GLU-E]
+  
+0              : is the atom moving from molecule B to molecule A,  0-forward,  1-backward
+H3O   H2O      : change of molecule A (Hydronium->Water)
+GLU-E GLU-P    : change of molecule B (GUE->GUP)
+3	       : number of possible pathways
+
+: Pathway 1
+: A description of reaction contains three parts:
+1    3     15   : number of moving part, first part, second part
+: moving part:
+2    16	   : the index 3 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to HIE)
+: rest part: ( first type in the pair )
+1    1     :
+3    2     :
+4    3     : 
+: newing part: ( second type in the pair )
+1    1     : 
+2    2     : 
+3    3     : 
+4    4
+5    5
+6    6
+7    7
+8    8
+9    9
+10   10
+11   11
+12   12
+13   13
+14   14
+15   15
+
+: ----------------------------------------------------------------------------
+
+: Pathway 2
+: A description of reaction contains three parts:
+1    3     15   : number of moving part, first part, second part
+: moving part:
+3    16	   : the index 3 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to HIE)
+: rest part: ( first type in the pair )
+1    1     :
+2    2     :
+4    3     : 
+: newing part: ( second type in the pair )
+1    1     : 
+2    2     : 
+3    3     : 
+4    4
+5    5
+6    6
+7    7
+8    8
+9    9
+10   10
+11   11
+12   12
+13   13
+14   14
+15   15
+
+: ----------------------------------------------------------------------------
+
+: Pathway 3
+: A description of reaction contains three parts:
+1    3     15   : number of moving part, first part, second part
+: moving part:
+4    16	   : the index 3 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to HIE)
+: rest part: ( first type in the pair )
+1    1     :
+2    2     :
+3    3     : 
+: newing part: ( second type in the pair )
+1    1     : 
+2    2     : 
+3    3     : 
+4    4
+5    5
+6    6
+7    7
+8    8
+9    9
+10   10
+11   11
+12   12
+13   13
+14   14
+15   15
+  
+  [reaction.end]
+
+: ----------------------------------------------------------------------------
+  
+  [reaction.start.GLU-P_H2O]
+
+0                : is the atom moving from molecule B to molecule A,  0-forward,  1-backward
+GLU-P  GLU-E     : change of molecule A (GUP->GUE)
+H2O    H3O       : change of molecule B (Water->Hydronium)
+1	         : number of possible pathways
+
+: Pathway 1
+: A description of reaction contains three parts:
+1    15    3   : number of moving part, first part, second part
+: moving part:
+16   2	   : the index 3 atom of type 1 will turn into index 2 atom of type 2 (HO from Hydronium to HIE)
+: rest part: ( first type in the pair )
+1    1     : 
+2    2     : 
+3    3     : 
+4    4
+5    5
+6    6
+7    7
+8    8
+9    9
+10   10
+11   11
+12   12
+13   13
+14   14
+15   15
+: newing part: ( second type in the pair )
+1    1
+2    3
+3    4
+  
+  [reaction.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+[segment.end]
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+:::S                                                                      S:::
+:::S   SEGMENT:   STATE SEARCH ALGORITHMN                                 S:::
+:::S                                                                      S:::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+[segment.state_search]
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+: is refining states
+#ifdef EVB3
+  0
+#endif
+
+#ifdef EVB2
+  1
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef WAT
+
+[state_search.start.H3O]
+
+  : host;  target;  client;   shell limit;   distance limit;    reaction pair;  reaction path
+  : H->OW
+
+  #ifdef WAT_WAT
+    2      H2O         1            3                2.5        H3O_H2O           1
+    3      H2O         1            3                2.5        H3O_H2O           2
+    4      H2O         1            3                2.5        H3O_H2O           3
+  #endif
+
+  #ifdef HIS_WAT        
+  : H->OC
+    2      HIS-E      11            3                2.5        H3O_HIS-E         1
+    3      HIS-E      11            3                2.5        H3O_HIS-E         2
+    4      HIS-E      11            3                2.5        H3O_HIS-E         3
+  #endif
+
+  #ifdef GLU_WAT        
+  : H->OC
+    2      GLU-E      11            3                2.5        H3O_GLU-E         1
+    3      GLU-E      11            3                2.5        H3O_GLU-E         2
+    4      GLU-E      11            3                2.5        H3O_GLU-E         3
+  #endif
+  
+[state_search.end]
+
+: ----------------------------------------------------------------------------
+
+[state_search.start.H2O]
+
+  : host;  target;  client;   shell limit;   distance limit;    reaction pair;  reaction path
+  : H->OW
+
+
+  #ifdef WAT_WAT  
+    2      H2O         1            3                2.5        H3O_H2O           2
+    3      H2O         1            3                2.5        H3O_H2O           3
+  #endif
+ 
+  #ifdef HIS_WAT        
+  : H->OC
+    2      HIS-E      11            3                2.5        H3O_HIS-E         2
+    3      HIS-E      11            3                2.5        H3O_HIS-E         3
+  #endif
+
+  #ifdef GLU_WAT        
+  : H->OC
+    2      GLU-E      11            3                2.5        H3O_GLU-E         2
+    3      GLU-E      11            3                2.5        H3O_GLU-E         3
+  #endif
+          
+[state_search.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef HIS
+
+[state_search.start.HIS-P]
+  #ifdef HIS_WAT
+    13     H2O         1            3                3.0        HIS-P_H2O         1
+  #endif
+[state_search.end]
+
+[state_search.start.HIS-E]
+[state_search.end]
+
+#endif
+
+
+#ifdef GLU
+
+[state_search.start.GLU-P]
+  #ifdef GLU_WAT
+     16    H2O       1            1                2.5        GLU-P_H2O              1
+  #endif
+[state_search.end]
+
+[state_search.start.GLU-E]
+[state_search.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+[segment.end]
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+:::S                                                                      S:::
+:::S   SEGMENT:   OFF_DIAGONAL COUPLINGS                                  S:::
+:::S                                                                      S:::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+[segment.off_diagonal]
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+::::::::::::::::::::::::::::::::::::::
+: for pt of H3O->H2O
+::::::::::::::::::::::::::::::::::::::
+
+#ifdef WAT_WAT
+
+[off_diagonal.start.H3O_H2O]
+
+PT  : Use the PT coupling 
+
+: Geometry part
+ 
+ : Geometry part
+  
+  : atom index
+ 1  1              : evb_index of DONOR atom (should be in molecule A)
+ 2  1              : evb_index of ACCEPT atom (should be in molecule B)
+ 2  2              : evb_index of HYDROGEN atom (should be in molecule B)
+  
+  : A_Rq Type : A(R,q) = f(R) * g(q)
+ 1 : 1-symmetric; 2-asymmetric
+   
+  #ifdef EVB3 
+  
+  : parameters
+   1.8302895      : g
+   0.2327260      : P
+   9.562153       : k
+   2.94           : D_oo
+   6.0179066      : b
+   3.100          : R0_oo
+   10.8831327     : P'
+   10.0380922     : a
+   1.8136426      : r0_oo
+
+ : Potential part
+   -23.1871874        : vij_const, in kcal/mol
+     1                : if contains Vij_ex part
+         
+  : exchanged charge
+   H2O  H3O : Types of molecule_A (Water) and molecule_B (Hydronium)
+
+   -0.0895456
+    0.0252683
+    0.0252683
+   -0.0895456
+    0.0780180
+    0.0252683
+    0.0252683  
+
+  #endif
+
+  #ifdef EVB2
+  
+  : parameters
+   1.85           : gamma
+   0.27           : P
+   11.5           : k
+   2.875          : D_oo
+   4.50           : beta
+   3.14           : R0_oo
+   10.0           : P'
+   12.0           : alpha
+   1.88           : r0_oo
+
+ : Potential part
+   -32.419        : vij_const, in kcal/mol
+     1                : if contains Vij_ex part
+         
+  : exchanged charge
+   H2O  H3O : Types of molecule_A (Water) and molecule_B (Hydronium)
+   
+   -0.116725
+    0.04669
+    0.04669
+   -0.116725
+    0.04669
+    0.04669
+    0.04669  
+  
+  #endif
+  
+[off_diagonal.end]
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef HIS_WAT
+  
+[off_diagonal.start.HIS-P_H2O]
+  
+  PT  : Type of coupling: Proton Transfer
+  1 11 : evb_index of DONOR atom (should be in molecule A)
+  2 1  : evb_index of ACCEPT atom (should be in molecule B)
+  2 2  : evb_index of HYDROGEN atom (should be in molecule B)
+  
+  : A_Rq Type : A(R,q) = f(R) * g(q)
+  2 : 1-symmetric; 2-asymmetric
+
+  : parameters for his
+    1.19           : r0_sc
+    0.06           : lamda
+    2.47           : R0_DA
+    0.46           : C
+    1.33           : alpha
+    3.72           : a_DA
+    3.50           : beta
+    2.20           : b_DA
+   13.54           : epsinal
+    2.25           : c_DA
+    2.27           : gamma
+
+ : Potential part
+  -96.92           : vij_const, in kcal/mol
+    0              : if contains Vij_ex part
+
+[off_diagonal.end]
+
+: ----------------------------------------------------------------------------
+
+[off_diagonal.start.H3O_HIS-E]
+  
+  PT  : Type of coupling: Proton Transfer
+  2 11 : evb_index of DONOR atom (should be in molecule A)
+  1 1  : evb_index of ACCEPT atom (should be in molecule B)
+  2 13  : evb_index of HYDROGEN atom (should be in molecule B)
+  
+  : A_Rq Type : A(R,q) = f(R) * g(q)
+  2 : 1-symmetric; 2-asymmetric
+
+  : parameters for his
+    1.19           : r0_sc
+    0.06           : lamda
+    2.47           : R0_DA
+    0.46           : C
+    1.33           : alpha
+    3.72           : a_DA
+    3.50           : beta
+    2.20           : b_DA
+   13.54           : epsinal
+    2.25           : c_DA
+    2.27           : gamma  
+
+ : Potential part
+  -96.92           : vij_const, in kcal/mol
+    0              : if contains Vij_ex part
+	
+[off_diagonal.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef GLU_WAT
+
+[off_diagonal.start.GLU-P_H2O]
+  
+  PT   : Type of coupling: Proton Transfer
+  1 14 : evb_index of DONOR atom (should be in molecule A)
+  2 1  : evb_index of ACCEPT atom (should be in molecule B)
+  2 2  : evb_index of HYDROGEN atom (should be in molecule B)
+  
+  : A_Rq Type : A(R,q) = f(R) * g(q)
+  2 : 1-symmetric; 2-asymmetric
+
+  : parameters for glu 
+    1.03           : r0_sc
+   -0.076          : lamda
+    2.57           : R0_DA
+    0.8911         : C
+    1.83           : alpha
+    2.86           : a_DA
+   -0.058          : beta
+    2.27           : b_DA
+    1.77           : epsinal
+    2.59           : c_DA
+    6.43           : gamma
+
+ : Potential part
+  -26.43           : vij_const, in kcal/mol
+    0              : if contains Vij_ex part
+
+  [off_diagonal.end]
+  
+  [off_diagonal.start.H3O_GLU-E]
+  
+  PT    : Type of coupling: Proton Transfer
+  2 14  : evb_index of DONOR atom (should be in molecule A)
+  1 1   : evb_index of ACCEPT atom (should be in molecule B)
+  2 16  : evb_index of HYDROGEN atom (should be in molecule B)
+  
+  : A_Rq Type : A(R,q) = f(R) * g(q)
+  2 : 1-symmetric; 2-asymmetric
+
+  : parameters for glu 
+    1.03          : r0_sc
+   -0.076         : lamda
+    2.57          : R0_DA
+    0.8911        : C
+    1.83          : alpha
+    2.86          : a_DA
+   -0.058         : beta
+    2.27          : b_DA
+    1.77          : epsinal
+    2.59          : c_DA
+    6.43          : gamma
+
+ : Potential part
+  -26.43          : vij_const, in kcal/mol
+    0             : if contains Vij_ex part
+
+  [off_diagonal.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+[segment.end]
+
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+:::S                                                                      S:::
+:::S   SEGMENT:   REPULSIVE TERMS                                         S:::
+:::S                                                                      S:::
+:::SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS:::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+[segment.repulsive]
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef WAT
+
+[repulsive.start.H3O]
+  
+Hydronium : H3O
+
+:::::::::::::::::::::::::::::::::::::::::::
+
+: The parameters
+
+H3O  : EVB_Type of H3O
+OW   : Atom_Type of OW
+  
+  #ifdef EVB3
+  
+11.2600138    : B
+ 1.1          : b
+ 2.12         : b'
+ 2.4          : d_OO
+ 4.5715736    : C
+ 2.1          : c
+ 1.0          : d_OH
+
+: cutoff for OO
+2.85   3.05
+
+: cutoff for OH
+2.3    2.5
+
+  #endif
+
+  #ifdef EVB2
+
+14.014       : B
+2.20         : b
+0.000000     : b'
+2.40         : d_OO
+7.387        : C
+3.60         : c
+0.98         : d_OH
+
+: cutoff for OO
+2.85   3.05
+
+: cutoff for OH
+2.50   3.00  
+  
+  #endif
+  
+[repulsive.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef HIS
+
+[repulsive.start.HIS-P]
+
+VII : Constant Vii - JPCA, 110, 631-639 (2006)
+
+: The parameters
+
+HIS-P       : EVB_Type of HIS
+
+-101.4229   : contant Vii
+
+[repulsive.end]
+
+#endif
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+#ifdef GLU
+
+[repulsive.start.GLU-P]
+
+VII : Constant Vii - JPCA, 110, 631-639 (2006)
+
+: The parameters
+
+GLU-P   : EVB_Type of GLU
+
+-109.72 : contant Vii
+
+[repulsive.end]
+
+#endif
+
+
+[segment.end]
+
+: ----------------------------------------------------------------------------
+: ----------------------------------------------------------------------------
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
