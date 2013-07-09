@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
     
 
 /*----------------------------------------------------------------------------------
- * open file and find TEMPER, ANNEAL, COORDX, COLVARX, RELAMB initializer 
+ * open file and find TEMPER, ANNEAL, COORDX, COLVARX, RELAMB, REUS initializer 
  */
             
     MPI_Barrier(MPI_COMM_WORLD);
@@ -244,13 +244,17 @@ int main(int argc, char **argv) {
     int temperflag = 0, annealflag = 0;		// RE or SA 
     int coordxflag = 0;                         // Coordinate exchange
     int colvarxflag = 0;                        // Colvar exchange
-    int relambdaflag = 0;                       // Lambda scalinge exchange for RAPTOR
+    int relambdaflag = 0;                       // Lambda scaling exchange for RAPTOR
+    int reusflag = 0;                           // REUS flag for RAPTOR
     double temp, temp_hi, temp_lo;		// RE temp, SA high and low temp
     char fix[50], file[50];			// fix id, restart binary filename
     char CVID[50];			        // Collecvtive Variable ID 
     int replicaID = -1;                         // replica ID for coordx
     int dump_swap = 0;                          // swap dump file names in temper
     double lambda = 0.0;                        // scaling scalar
+    int nsteps_short = 0;                       // short run steps for asynchronous REUS
+    int coordtype = -1;                         // REUS coordinate type
+    int dump = 0;                               // REUS dump frequency
 
 
     // doing everything on root of subcomms
@@ -268,8 +272,9 @@ int main(int argc, char **argv) {
 		fpos_t position;
 
 		// search for TEMPER or ANNEAL line by checking first 9 chars
-		while( (temperflag + annealflag + coordxflag + colvarxflag + relambdaflag) == 0 
-                      && !feof(infile)) {	
+                int flag_sum = temperflag + annealflag + coordxflag 
+                               + colvarxflag + relambdaflag + reusflag;
+		while( flag_sum == 0 && !feof(infile) ) {	
 			fgetpos(infile, &position);	// store position
 			fgets(command, 9, infile);	// read in 9 chars
 			fscanf(infile, "\n");		// move to end of line
@@ -279,6 +284,9 @@ int main(int argc, char **argv) {
 			else if(strcmp(command, "#COORDX:") == 0) coordxflag = 1;
 			else if(strcmp(command, "#COLVARX") == 0) colvarxflag = 1;
 			else if(strcmp(command, "#RELAMB:") == 0) relambdaflag = 1;
+			else if(strcmp(command, "#REUS:  ") == 0) reusflag = 1;
+                        flag_sum = temperflag + annealflag + coordxflag 
+                                   + colvarxflag + relambdaflag + reusflag;
 		}
 
 		// come back to beginning of line
@@ -358,6 +366,22 @@ int main(int argc, char **argv) {
                         len = strlen(CVID) - 1;
                         CVID[len] = 0;
                         bseed = 0; // not used by RELAMBDA, we only need one seed
+                } else if(reusflag) {
+                        int n = fscanf(infile, "#REUS:   CVID %s", CVID);
+                        n += fscanf(infile, " run %d, swap %d, temp %lf, fix %s",
+                                       &nsteps, &nevery, &temp, fix);
+                        n += fscanf(infile, " seed %d, coordtype %d, short %d, dump %d",
+                                       &sseed, &coordtype, &nsteps_short, &dump);
+                        if (n != 9) {
+                          printf("Problem reading #REUS line on subcomm %d.\n", gproc_lcomm[this_global_proc]);
+                          printf("Wrong number of input fields. Please check that formatting strictly complies.\n");
+                          exit(1);
+                        }
+                        int len = strlen(fix) - 1;
+                        fix[len] = 0;
+                        len = strlen(CVID) - 1;
+                        CVID[len] = 0;
+                        bseed = 0; // not used by REUS, we only need one seed
                 }
 		
         fclose(infile);
@@ -369,6 +393,7 @@ int main(int argc, char **argv) {
     MPI_Bcast(&coordxflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&colvarxflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&relambdaflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&reusflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	
     MPI_Bcast(&nsteps, 1, MPI_INT, 0, subcomm);
     MPI_Bcast(&nevery, 1, MPI_INT, 0, subcomm);
@@ -446,13 +471,35 @@ int main(int argc, char **argv) {
                 printf("---> Subcomm %d will use %s as its LID\n", gproc_lcomm[this_global_proc], CVID);
             }
 
+        } else if(reusflag) {
+
+            MPI_Bcast(CVID, 50, MPI_CHAR, 0, subcomm);
+            MPI_Bcast(&sseed, 1, MPI_INT, 0, subcomm);
+            MPI_Bcast(&temp, 1, MPI_DOUBLE, 0, subcomm);
+            MPI_Bcast(&coordtype, 1, MPI_INT, 0, subcomm);
+            MPI_Bcast(&nsteps_short, 1, MPI_INT, 0, subcomm);
+            MPI_Bcast(&dump, 1, MPI_INT, 0, subcomm);
+            if(this_global_proc == 0) {
+                printf("Preparing to run replica exchange umbrella sampling simulation:\n");
+                printf("---> Run %d total timesteps\n", nsteps);
+                printf("---> Attempt exchange every %d timesteps\n", nevery);
+                printf("---> Using fix id %s\n", fix);
+                printf("---> Using random seed %d\n", sseed);
+                printf("---> Using coordinate type %d\n", coordtype);
+                printf("---> Run %d short timesteps\n", nsteps_short);
+                printf("---> Dump COLVAR data every %d time steps\n", dump);
+            }
+            if (this_local_proc == 0) {
+                printf("---> Subcomm %d will use %s as its CVID\n", gproc_lcomm[this_global_proc], CVID);
+            }
+
 	} else {		
                 // could not find tag 
 		if(this_global_proc == 0) {
 			printf("No multi-replica simulation specificied in input script.\n");
 			printf("Please specifiy a simulation.\n");
                         printf("Valid options are (whitespace sensitive):\n");
-                        printf("'#TEMPER: ', '#ANNEAL: ', '#COORDX: ', '#COLVARX: ', '#RELAMB: '\n"); 
+                        printf("'#TEMPER: ', '#ANNEAL: ', '#COORDX: ', '#COLVARX: ', '#RELAMB: ', '#REUS:   '\n"); 
 			printf("Exiting.\n\n");
 			exit(1);
 		}
@@ -482,11 +529,11 @@ int main(int argc, char **argv) {
     char str2[] = "-log";
     char str3_none[] = "none";
     char str3_log[256];
-    //if (reusflag) {
-    //  // New CVID labelling
-    //  sprintf(str3_log,"log.cv.%s", CVID);
-    //} else {
-    if (coordxflag || colvarxflag) {
+    if (reusflag) {
+      sprintf(str3_log,"log.cv.%s", CVID);
+    } else if (relambdaflag) {
+      sprintf(str3_log,"log.id.%s", CVID);
+    } else if (coordxflag || colvarxflag) {
       sprintf(str3_log,"log.id.%d", replicaID);
     } else {
       // Default to split key labelling
@@ -618,6 +665,12 @@ int main(int argc, char **argv) {
             printf("---> Beginning replica exchange lambda simulation at temperature %f \n", temp);
 
        relambda(lmp, subcomm, CVID, nsteps, nevery, n_comms, split_key, temp, fix, sseed, lambda);
+    }
+    else if(reusflag) {
+        if (this_global_proc == 0)
+            printf("---> Beginning replica exchange umbrella sampling simulation at temperature %f \n", temp);
+
+       reus(lmp, subcomm, CVID, nsteps, nevery, n_comms, split_key, temp, fix, sseed, coordtype, nsteps_short, dump);
     }
 
 /*----------------------------------------------------------------------------------

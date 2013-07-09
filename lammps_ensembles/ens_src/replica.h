@@ -78,6 +78,16 @@ void coord_exchange(void *, MPI_Comm, int, int, Replica *, char *, int);
 void colvar_exchange(void *, MPI_Comm, int, int, Replica *, char *, int);
 void relambda(void *, MPI_Comm, char*, int, int, int, int, double, char*, int, double);
 
+/*
+ *  REUS functions
+ */
+void reus  (void *, MPI_Comm, char*, int, int, int, int, double, char *, int, int, int, int);
+void write_to_colvar_init(double, double, int);
+void write_to_colvar(double, double, double, int, int);
+void write_to_colvar_init_vec(double*, double*, double*, int, char*);
+void write_to_colvar_vec(bigint, double*, double, double, int, int, char*);
+void get_umbrella_data(void*, char*, double*, double*, double*, double*, double*, double*);
+
 
 
 #endif /* __REPLICA_H__ */
