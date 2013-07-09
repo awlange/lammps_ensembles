@@ -87,9 +87,10 @@ colvarproxy_lammps::colvarproxy_lammps(LAMMPS_NS::LAMMPS *lmp,
   restart_prefix_str = std::string("rest");
 
   // try to extract a restart prefix from a potential restart command.
-  if (_lmp->output->restart_every_single > 0) {
+  // AWGL: bug fixes included
+  if (_lmp->output->restart_every_single > 0 && _lmp->output->restart_flag_single) {
     restart_prefix_str = std::string(_lmp->output->restart1);
-  } else if  (_lmp->output->restart_every_double > 0) {
+  } else if  (_lmp->output->restart_every_double > 0 && _lmp->output->restart_flag_double) {
     restart_prefix_str = std::string(_lmp->output->restart2a);
   }
   // trim off unwanted stuff from the restart prefix
