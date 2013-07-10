@@ -1,0 +1,44 @@
+# collective variable example: monitor distances
+
+colvarsTrajFrequency 2 # Dump every two steps 
+colvarsRestartFrequency 1000
+
+colvar {
+  name one
+
+  distance {
+    group1 {
+      atomNumbers 16 
+    }
+    group2 {
+      atomNumbers 52
+    }
+  }
+}
+
+harmonic {
+  name h_pot1
+  colvars one
+  centers 15.3
+  forceConstant 80.0
+}
+
+colvar {
+  name two
+
+  distance {
+    group1 {
+      atomNumbers 1 
+    }
+    group2 {
+      atomNumbers 10
+    }
+  }
+}
+
+harmonic {
+  name h_pot2
+  colvars two
+  centers 3.8
+  forceConstant 80.0
+}

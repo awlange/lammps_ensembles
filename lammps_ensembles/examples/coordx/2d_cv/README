@@ -1,0 +1,27 @@
+This example illustrates how to perform a 2 dimensionsal replica exchange
+umbrella sampling calculation. Both collective variables (CVs) 
+are a distance between two atoms in the peptide. 
+
+o  There are 16 replicas, each with its own CV equilibria defined in 
+   the files peptide.colvars.* 
+
+o  There is a separate input for each replica, files in.peptide.*
+   Each input contains the COORDX, REPLICA, DIMENSION, and NEIGHBORS
+   headers to define the run settings.
+
+o  All replicas run at 275.0 Kelvin.
+
+o  The file ens_input.dat contains a listing of the replica indexes,
+   the input files for each replica, and how many MPI ranks to use. 
+
+o  The data.peptide.* files define the force field types, etc. and
+   the starting geometry. All replicas begin with the same geometry
+   in this example (because I am lazy).
+
+o  CAUTION: The out.*.colvars.traj files will contain repeated lines  
+   due to swapping. In post-processing, just be aware of that!
+   
+o  To run this example, use the following (noting that you may need
+   to specify the full path of ens_driver depending on your $path):
+   
+   mpiexec -np 16 ens_driver 16 -log -readinput ens_input.dat

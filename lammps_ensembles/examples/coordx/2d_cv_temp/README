@@ -1,0 +1,53 @@
+This example illustrates how to perform a 2 dimensionsal replica exchange
+parallel tempering/umbrella sampling calculation. The collective variable 
+(CV) is just a distance between two atoms of different sidechains of the peptide. 
+
+o  There are 16 replicas, each with a different set temperature and 
+   CV combination:
+   id  temp    CV equil
+   0   275.0   15.0
+   1   285.0   15.0
+   2   295.0   15.0
+   3   305.0   15.0
+   4   275.0   15.1
+   5   285.0   15.1
+   6   295.0   15.1
+   7   305.0   15.1
+   8   275.0   15.2
+   9   285.0   15.2
+   10  295.0   15.2
+   11  305.0   15.2
+   12  275.0   15.3
+   13  285.0   15.3
+   14  295.0   15.3
+   15  305.0   15.3
+
+o  The topology of the replica neighbors is a square, 4 temperatures
+   by 4 CVS. Both dimensions are non-circular. The neighboring looks
+   like this (arrow points in positive direction):
+
+   temperature--> 
+   12  13  14  15   ^
+    8   9  10  11   |
+    4   5   6   7   |
+    0   1   2   3   CV
+
+o  There is a separate input for each replica, files in.peptide.*
+   Each input contains the COORDX, REPLICA, DIMENSION, and NEIGHBORS
+   headers to define the run settings.
+
+o  The file ens_input.dat contains a listing of the replica indexes,
+   the input files for each replica, and how many MPI ranks to use. 
+
+o  The data.peptide.* files define the force field types, etc. and
+   the starting geometry. All replicas begin with the same geometry
+   in this example (because I am lazy).
+
+o  CAUTION: The out.*.colvars.traj files will contain repeated lines  
+   due to swapping. In post-processing, just be aware of that!
+
+o  To run this example, use the following (noting that you may need
+   to specify the full path of ens_driver depending on your $path):
+   
+   mpiexec -np 16 ens_driver 16 -log -readinput ens_input.dat
+   
