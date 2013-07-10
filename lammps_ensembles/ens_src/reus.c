@@ -82,8 +82,21 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
       printf("Number of regular steps must divide number of swaps.\n");
       exit(1);
     }
-    if (this_global_proc == 0)
+    if (this_global_proc == 0) {
       printf("Will run for %d swap steps.\n", i_nswaps);
+      printf("Swap runs divided into %d dump segments.\n", div_step);
+    }
+    if (div_step < 1) {
+      if (this_global_proc == 0) {
+        printf("ERROR.\n");
+        printf("Swap frequency: %d \n", i_nevery);
+        printf("Dump frequency: %d \n", i_dump);
+        printf("swap/dump = %d/%d = %d < 1\n", i_nevery, i_dump, div_step);
+        printf("swap/dump must be equal to or greater than 1. Please adjust input.\n");
+      }
+      MPI_Barrier(MPI_COMM_WORLD);
+      exit(1);
+    }
 
 /*----------------------------------------------------------------------------------
  * Check for asynchronous load balancing 
@@ -594,11 +607,11 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
 
 #ifdef REUS_DEBUG
             double after[3];
-            after[0] = lammps_extract_umbrella_data(lmp, fix, 4, 0);
-            after[1] = lammps_extract_umbrella_data(lmp, fix, 4, 1);
-            after[2] = lammps_extract_umbrella_data(lmp, fix, 4, 2);
-            printf("Replica %d xa0: before = %f %f %f after = %f %f %f\n", i_comm, 
-                    bias_xa0[0], bias_xa0[1], bias_xa0[2], after[0], after[1], after[2]);
+            //after[0] = lammps_extract_umbrella_data(lmp, fix, 4, 0);
+            //after[1] = lammps_extract_umbrella_data(lmp, fix, 4, 1);
+            //after[2] = lammps_extract_umbrella_data(lmp, fix, 4, 2);
+            //printf("Replica %d xa0: before = %f %f %f after = %f %f %f\n", i_comm, 
+            //        bias_xa0[0], bias_xa0[1], bias_xa0[2], after[0], after[1], after[2]);
             after[0] = lammps_extract_umbrella_data(lmp, fix, 1, 0);
             after[1] = lammps_extract_umbrella_data(lmp, fix, 1, 1);
             after[2] = lammps_extract_umbrella_data(lmp, fix, 1, 2);
