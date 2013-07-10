@@ -247,6 +247,105 @@ First and very importantly, comment out
 or delete the \texttt{run \#} command in the LAMMPS input script. If this is not done,
 the LE driver will not work properly. 
 
+Secondly, there is a TEMPER tag. The syntax is somewhat strict,
+so follow as closely as possible and {\em do not} add extra spaces.
+
+\textbf{The TEMPER tag.} This is the only tag used in the TEMPER code. Its syntax is:
+\begin{verbatim}
+#TEMPER: run [R], swap [S], temp [T], fix [F], seed [SS], dumpswap [D]
+\end{verbatim}
+The variables in the square brackets are described here:
+\begin{itemize}
+\item	\texttt{[R]} = An integer. The total number of MD steps to be taken.
+\item	\texttt{[S]} = An integer. Swap frequency. This is the number of MD steps taken between exchange attempts.
+\item	\texttt{[T]} = A float. Temperature for this replica. Makes sure it's the same as your NVT thermostat.
+\item 	\texttt{[F]} = A string. The fix ID of the NVT thermostat. Used to extract thermal information.
+\item	\texttt{[SS]} = An integer. Seeds the random number generator for the Metropolis
+		acceptance criteria.
+		If $\texttt{[N]} = 0$,
+		then the direction of swapping alternates as up/down. Otherwise, the direction of swaps
+		is random. This is meant to be used for debugging purposes.
+\item	\texttt{[D]} = An integer, either 1 or 0. This turns on/off if you want to have the file names for dumps
+		exchanged between replicas. This is useful so that a given dump file contains only data from one temperature.
+		Otherwise, it will be all mixed. It is recommended to set this to 1.
+\end{itemize}
+
+Sampling data can be extracted from TEMPER runs from dump files. It is best to set \texttt{[D]} to 1 so that
+the dump files contain data only for one temperature. The dump files will contain data according to the
+replica index.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{REUS}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Replica exchange umbrella sampling for MS-EVB with RAPTOR. Uses the fix\_umbrella code for the umbrella bias.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Modified LAMMPS input file format}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+First and very importantly, comment out
+or delete the \texttt{run \#} command in the LAMMPS input script. If this is not done,
+the LE driver will not work properly. 
+
+Secondly, there is a REUS tag. The syntax is somewhat strict,
+so follow as closely as possible and {\em do not} add extra spaces.
+
+\textbf{The REUS tag.} This is the only tag used in the TEMPER code. Its syntax is (all on {\em one} line):
+\begin{verbatim}
+#REUS:   CVID [ID], run [R], swap [S], temp [T], fix [F], seed [SS], 
+coordtype [CT], short [SH], dump [D]
+\end{verbatim}
+Please ignore the line break after \texttt{[SS],}. I couldn't fit this all on one line, but the code expects only one line.\\
+\textbf{\em NOTE}: There must be 3 spaces between \texttt{\#REUS:} and \texttt{CVID}. This is very important! The
+driver is strict about this.\\
+
+The variables in the square brackets are described here:
+\begin{itemize}
+\item	\texttt{[ID]} = A string. An identification you want to give to your replica to keep track of which it is.
+		This is used to keep track of which COLVAR and log files we write to.
+\item	\texttt{[R]} = An integer. The total number of MD steps to be taken.
+\item	\texttt{[S]} = An integer. Swap frequency. This is the number of MD steps taken between exchange attempts.
+\item	\texttt{[T]} = A float. Temperature for this replica. Makes sure it's the same as your NVT thermostat.
+\item	\texttt{[F]} = A string. The fix ID for fix\_umbrella. Used to extract bias information.
+\item	\texttt{[SS]} = An integer. Seeds the random number generator for the Metropolis
+		acceptance criteria.
+		If $\texttt{[N]} = 0$,
+		then the direction of swapping alternates as up/down. Otherwise, the direction of swaps
+		is random. This is meant to be used for debugging purposes.
+\item	\texttt{[CT]} = An integer. The coordinate type for fix\_umbrella.\\
+		The supported options are: 0 = COORD\_CART and 2 = COORD\_CYLINDER.
+\item	\texttt{[SH]} = An integer. Number of short steps for asynchronous load balancer. This is an advanced option.
+		Leave it as 0 if you don't know what this is. It is only useful if your MS-EVB replicas have disparate run times
+		because they have different numbers of MS-EVB states. In that case, it is possible to set \texttt{[SH]} to a
+		small integer, like 5, to take extra MD steps while waiting for slower replicas to catch up. This can boost
+		the overall productivity by still running MD during MPI waits at exchange steps.
+\item	\texttt{[D]} = An integer. Dump frequency. How often to write the bias information to the COLVAR.* files.
+		\texttt{[D]} must satisfy the condition: 1 $\le$ \texttt{[D]} $\le$ \texttt{[S]}. Otherwise, LE will crash.
+\end{itemize}
+
+Bias information during the REUS run is output to COLVAR.* files, containing current bias energies and other information for each
+time step. These files only contain data from one umbrella window. The index of the communicator writing to the COLVAR file is
+listed as ``comm" in the last column. V\_bias is the bias energy at that time step.
+
+At the end of an REUS run, final restart files are written to disk according to the final configuration of replica indices.
+That is, restart\_final.2 corresponds to the umbrella window index 2. This is to make it easier to restart REUS runs without
+having to disentangle which replica index belongs to which restart file.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{REUS}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Replica exchange using off-diagonal scaling for MS-EVB. $\lambda$ exchange. Documentation pending.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Modified LAMMPS input file format}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Under construction.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{COLVARX}
@@ -297,7 +396,7 @@ The variables in the square brackets are described here:
 
 \textbf{The REPLICA tag.}
 After the COLVARX tag, LE will search for the REPLICA tag to gather information specific
-to the given replica. It's syntax is:
+to the given replica. Its syntax is:
 \begin{verbatim}
 #REPLICA: id [I], ndim [Ndim], temp [T], tdim [TD]
 \end{verbatim}
@@ -452,7 +551,7 @@ The variables in the square brackets are described here:
 
 \textbf{The REPLICA tag.}
 After the COORDX tag, LE will search for the REPLICA tag to gather information specific
-to the given replica. It's syntax is:
+to the given replica. Its syntax is:
 \begin{verbatim}
 #REPLICA: id [I], ndim [Ndim], temp [T], tdim [TD]
 \end{verbatim}
@@ -565,7 +664,7 @@ The general call looks like this:
 \begin{verbatim}
 ens_driver P [-suffix omp] [-log] -readinput (infile)
 \end{verbatim}
-The parts in square brackets are optional, but the parts in parenthese are mandatory variables. 
+The parts in square brackets are optional, but the parts in parentheses are mandatory variables. 
 The variable descriptions are here:
 \begin{itemize}
 \item	\texttt{ens\_driver} = The binary executable filename.
@@ -582,11 +681,18 @@ The variable descriptions are here:
 
 The \texttt{infile} is a text file and has the following syntax:
 \begin{verbatim}
-[Subcommunicator index] [LAMMPS input script filename] [Number of MPI ranks for this subcomm]
+[Subcommunicator index] [LAMMPS input script filename] [Number of MPI ranks for this subcomm] (Optional number of partitions)
 \end{verbatim}
 There should not be anything else in this text file. The number of MPI ranks
 for each subcommunicator must sum to the number of MPI ranks in MPI\_COMM\_WORLD. You
 may need to specify the full path for each LAMMPS input script.
+
+The optional number of partitions is primarily intended for use with the state decomposition algorithm for MS-EVB, which
+can make MS-EVB simulations with RAPTOR much faster if there are several MS-EVB states. Usually, 2 or 4 partitions works
+best, but you will need to test this on your own. Note that each partition will have an equal number of MPI ranks, as determined
+by dividing [Number of MPI ranks for this subcomm] by (Optional number of partitions). The code will crash with an error if
+there is an inconsistent number of MPI ranks and/or partitions. If the number of partitions is left out, it is assumed that
+no partitioning is being used.
 
 The above executable, of course, will need to be launched as part of an MPI run. This means
 that the user will need to use a command like
