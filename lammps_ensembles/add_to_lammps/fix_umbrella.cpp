@@ -295,6 +295,8 @@ void FixUmbrella::data_umbrella()
   {
     for(int i=0; i<3; i++) if (di[i]) k[i] = buf[m++];
     for(int i=0; i<3; i++) if (di[i]) ref[i] = buf[m++];
+    // ** AWGL: Ruibin's modified code ** //
+    if (RUIBIN_MOD) radius=buf[m++];
   }
   else if(coord==COORD_CYLINDER)
   {
@@ -372,6 +374,18 @@ void FixUmbrella::compute()
     VECTOR_PBC(dx);
     for(int i=0; i<3; i++) if (di[i]) dx[i] = dx[i]-ref[i];
     VECTOR_PBC(dx);
+
+    // ** AWGL: Ruibin's modified code ** //
+    if (RUIBIN_MOD) {
+      double dx3 = 0.0;
+      if ((di[0]) && (di[1])) dx3 = sqrt (dx[0]*dx[0]+dx[1]*dx[1]);
+      for(int i=0; i<=1; i++) if ((di[i]) && (dx3>=radius))
+      {
+          ff[i] = -k[i];
+          f[0][i] = - k[i] * dx[i] * (dx3-radius)/dx3; f[1][i] = -f[0][i]; // force decays zero at cutoff distance
+          dx2[i] = dx[i]*dx[i];
+      }
+    }
 	
     for(int i=0; i<3; i++) if (di[i])
     {

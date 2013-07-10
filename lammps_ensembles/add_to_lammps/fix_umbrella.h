@@ -33,6 +33,11 @@ namespace LAMMPS_NS {
 #define COORD_CYLINDER  2
 #define COORD_PT        3
 
+// ** AWGL : Turn on/off Ruibin's modified code ** //
+// 0 = off (normal), 1 = on (modified)
+#define RUIBIN_MOD 0 
+
+
 class FixUmbrella : public Fix 
 {
  public:
@@ -85,6 +90,11 @@ class FixUmbrella : public Fix
   double compute_array(int, int);
   void modify_fix(int, double*, char*);
   double h_save;
+
+#ifdef RUIBIN_MOD>0
+  // ** AWGL: Ruibin's modified code variable ** //
+  double radius;
+#endif
   
  private:
   FILE *InFile, *OutFile;
