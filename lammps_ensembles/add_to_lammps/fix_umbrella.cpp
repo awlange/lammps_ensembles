@@ -295,8 +295,10 @@ void FixUmbrella::data_umbrella()
   {
     for(int i=0; i<3; i++) if (di[i]) k[i] = buf[m++];
     for(int i=0; i<3; i++) if (di[i]) ref[i] = buf[m++];
+#if RUIBIN_MOD>0
     // ** AWGL: Ruibin's modified code ** //
-    if (RUIBIN_MOD) radius=buf[m++];
+    radius=buf[m++];
+#endif
   }
   else if(coord==COORD_CYLINDER)
   {
@@ -375,18 +377,25 @@ void FixUmbrella::compute()
     for(int i=0; i<3; i++) if (di[i]) dx[i] = dx[i]-ref[i];
     VECTOR_PBC(dx);
 
+#if RUIBIN_MOD>0
     // ** AWGL: Ruibin's modified code ** //
-    if (RUIBIN_MOD) {
-      double dx3 = 0.0;
-      if ((di[0]) && (di[1])) dx3 = sqrt (dx[0]*dx[0]+dx[1]*dx[1]);
-      for(int i=0; i<=1; i++) if ((di[i]) && (dx3>=radius))
-      {
+    double dx3 = 0.0;
+    if ((di[0]) && (di[1])) dx3 = sqrt (dx[0]*dx[0]+dx[1]*dx[1]);
+    for(int i=0; i<=1; i++) if ((di[i]) && (dx3>=radius))
+    {
           ff[i] = -k[i];
           f[0][i] = - k[i] * dx[i] * (dx3-radius)/dx3; f[1][i] = -f[0][i]; // force decays zero at cutoff distance
           dx2[i] = dx[i]*dx[i];
-      }
     }
-	
+    for(int i=2; i<=2; i++) if (di[i])
+    {
+          ff[i] = -k[i];
+          f[0][i] = - k[i] * dx[i]; f[1][i] = -f[0][i];
+          dx2[i] = dx[i]*dx[i];
+          energy += 0.5 * k[i] * dx2[i];
+    }
+#else
+    // ** Normal code ** //	
     for(int i=0; i<3; i++) if (di[i])
     {
 	  ff[i] = -k[i];
@@ -394,6 +403,7 @@ void FixUmbrella::compute()
 	  dx2[i] = dx[i]*dx[i];
 	  energy += 0.5 * k[i] * dx2[i];
     }
+#endif
 
     for(int i=0; i<3; i++) if (di[i]) dx[i] = x[0][i]-x[1][i];
     VECTOR_PBC(dx);
