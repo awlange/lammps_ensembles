@@ -20,25 +20,34 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 The purpose of this work is to document how to use the Multidimensional Replica Exchange Umbrella
-Sampling (REUS) part of the LAMMPS Ensemble (LE) interface. LE now also supports
-arbitrary dimensional Hamiltonian exchanges without collective variable constraints. The LE driver
-is an external executable program that links to a library build of LAMMPS with the 
-USER-COLVARS package installed. We will assume the user has some familiarity with
-compiling and running LAMMPS already. 
+Sampling (REUS) part of the LAMMPS Ensemble (LE) interface. The LE driver
+is an external executable program that links to a library build of LAMMPS. 
+The LAMMPS library must be compiled with the 
+USER-COLVARS and USER-RAPTOR packages installed.
+We will assume the user has some familiarity with compiling and running LAMMPS already. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{System Requirements}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 The LE is a parallel program written in C, and it should be compiled
-with a MPI C compiler (e.g., mpicc). 
+with a MPI C compiler (e.g., mpicc). However, sometimes a strict C compiler might be finicky,
+so using a MPI C++ compiler (e.g., mpicxx) will also work.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Installation}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 In the future, I would like there to be straightforward scripts to install this code,
-but until then, the user will just have to follow these instructions in sequence.
+but until then, the user will just have to follow these instructions in sequence. 
+
+There are 3 major steps:
+\begin{enumerate}
+	\item Obtain source code
+	\item Compile LAMMPS library
+	\item Compile the LE driver
+\end{enumerate}
+Each of these steps has further sub-steps involved, which we describe in detail below.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Obtain source code}
@@ -47,12 +56,21 @@ but until then, the user will just have to follow these instructions in sequence
 At the moment, you'll need to obtain the LE code and the modified LAMMPS
 library code directly from me, Adrian. Feel free to email me about it at alange@alcf.anl.gov. 
 
-You will also need to obtain the latest version of LAMMPS, which can be found at
-\texttt{http://lammps.sandia.gov/}. LE has been successfully run with the version from
+Alternatively, there is currently also a GitHub repository of the code at:\\
+\texttt{https://github.com/awlange/lammps\_ensembles}\\
+
+LE has been successfully run with the LAMMPS version from
 March 9, 2013. For convenience, a tarball of this version is provided with the LE package.
 In the rest of this manual, we will use path names involving this version of LAMMPS, but
 you will need to change it appropriately for your set up. If you plan to use this tarball,
 unpack it with \texttt{tar -xzf lammps.tar.gz}.
+
+LE {\em does not} ship with the USER-RAPTOR package (i.e., the RAPTOR code). RAPTOR has
+not been released publicly yet, and so we don't want to post it on GitHub. Also, without that
+package, LE will not compile and will have limited use, if any at all. This all means that
+you will need to obtain the latest version of USER-RAPTOR from the SVN repository maintained
+by the Voth group.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Compile LAMMPS}\label{sec:LAMMPS}
@@ -61,7 +79,11 @@ unpack it with \texttt{tar -xzf lammps.tar.gz}.
 \textbf{Step 1: Set up your Makefile.}
 You will need to \texttt{cd} into \texttt{lammps-9Mar13/src/MAKE} and edit your Makefile to 
 make sure that it is set up for your system. There are some examples provided if you need
-to set up one from scratch.
+to set up one from scratch. Also, you may find Makefiles for various machines on the Voth Wiki.
+
+\textbf{NOTE}: In order to use the $\lambda$ Exchange capability of LE, you {\em must} compile with
+the macro \texttt{-DRELAMBDA} defined in your Makefile. LE may fail to compile without this macro
+definition.
 
 You {\em should} compile with OpenMP compiler flags turned on, which tells the compiler
 to multi-thread loops and sections where OpenMP pragmas exist. How to specify the flag differs 
@@ -81,20 +103,33 @@ threaded routines that will benefit from having the OpenMP flags turned on.
 Type \texttt{make yes-USER-COLVARS} in \texttt{lammps-9Mar13/src}. This installs the
 interface to the colvars library provided with LAMMPS.
 
-\textbf{Step 4: Compile the colvars library.}
+\textbf{Step 4: Install the USER-RAPTOR package.}
+Type \texttt{make yes-USER-RAPTOR} in \texttt{lammps-9Mar13/src}. This installs the
+RAPTOR code for MS-EVB simulations. Again, remember to define the macro \texttt{-DRELAMBDA} in your
+Makefile to compile the $\lambda$ exchange code.
+
+\textbf{Optional step.} Install any other packages you may need in LAMMPS here. Otherwise, move on to the next step.
+
+\textbf{Step 6: Add the LE files to LAMMPS source.}
+There are a handful of files that need to be added to the LAMMPS source code in order
+for LE to work. They are contained in the directory \texttt{add\_to\_lammps}. Copy these
+over to the LAMMPS source directory, overwriting what is in there. (In the future, we
+will probably make this a USER package to simply.)
+
+\textbf{Step 7: Add the LE files to colvars library source.}
+There are a handful of files that need to be added to the LAMMPS source code in order
+for LE to work. They are contained in the directory \texttt{add\_to\_colvars}. Copy these
+over to the clovers library source directory (\texttt{lammps-9Mar13/lib/colvars}), 
+overwriting what is in there.
+
+\textbf{Step 8: Compile the colvars library.}
 Change your directory to \texttt{lammps-9Mar13/lib/colvars}. You can modify the
 makefile Makefil.g++ if you like or copy it over to a new modified one if you 
 need to for your system. It is compiled as a serial library. Once you are satisfied
 with the Makefile, type \texttt{make -f Makefile.g++} (or substitute your modified Makefile if
 you did so) to make the library.
 
-\textbf{Step 5: Add the LE files to LAMMPS source.}
-There are only three files that need to be added to the LAMMPS source code in order
-for LE to work. They are contained in the directory \texttt{add\_to\_lammps}. Copy these
-over to the LAMMPS source directory, overwriting what is in there. (In the future, we
-will probably make this a USER package to simply.)
-
-\textbf{Step 6: Compile LAMMPS as a library.}
+\textbf{Step 9: Compile LAMMPS as a library.}
 This is documented on the LAMMPS web site, but it follows
 a simple procedure similar to the usual executable compilation. Change directories into
 the \texttt{lammps-9Mar13/src} directory and type
@@ -108,48 +143,46 @@ end up with a binary file named \texttt{liblmp\_foo.a}. It is this file that you
 linking LE against.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Compile the LAMMPS Ensembles}
+\subsection{Compile the LAMMPS Ensembles Driver}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \textbf{Step 1: Set up your Makefile.}
 You will need to \texttt{cd} into \texttt{ens\_src} and edit your Makefile to 
 make sure that it is set up for your system, just like for the LAMMPS build.
-In the Makefile, you will need modify a few variables manually for your system:
+In the Makefile, you will need modify only a few variables manually for your system:
 \begin{itemize}
 	\item \texttt{LAMMPSDIR = dir/foo/src}\\
 		  	This is the path of your LAMMPS library build from Section~\ref{sec:LAMMPS}.
-		  	Set \texttt{dir/foo/src} to the appropriate path.
-		  
-    \item \texttt{LIBCOLVARS} = -L/dir/foo/lib/colvars\\
-    		This is the path of the colvars library for LAMMPS that you compiled above.
-    		Change to the appropriate path.
+		  	Set \texttt{dir/foo/src} to the appropriate path. Do not leave any spaces at the end of the line.
 		  
 	\item \texttt{LIBDIR = foo/fftw/lib/}\\
 			This specifies any external libraries that LAMMPS should be linked with. For example,
 			if you compiled LAMMPS with FFTW, then you need to specify the path of the FFTW
 			library here. Set \texttt{dir/foo/src\_lammps\_lib/} to the appropriate path.
 			
-	\item \texttt{LIB = -llmp\_foo -lfftw3f}\\
+	\item \texttt{LIB = -llmp\_foo -L\$(LIBCOLVARS) -lcolvars -lfftw3f}\\
 			These are the binary filenames of the libraries that you are linking with, following
 			the usual convention that a file like \texttt{liblmp\_foo.a} is included as
 			\texttt{-llmp\_foo}, removing the ``\texttt{ib}" and ``\texttt{.a}". You will
 			need to specify the LAMMPS library binary as well as any other libraries LAMMPS
 			is to be linked with, such as a certain FFTW library. The example, \texttt{-lfftw3f},
-			would be needed if you wanted to link with FFTW3 with single precision.	
+			would be needed if you wanted to link with FFTW3 with single precision. Be aware that the ordering
+			from left to right of the libraries listed is important, as is usually the case in Makefiles.
+			
 			
 	\item \texttt{DEBUG = -g}\\
 			This is for optional debugging flags. It can be left blank. Including \texttt{-g}
 			is useful for compiling with line references for stack traces or using the 
 			\texttt{gdb} debugger. You may also choose to specify the preprocessor macro
-			\texttt{-DCOORDX\_DEBUG} for extra printed output that shows what the random
+			\texttt{-DREUS\_DEBUG} for extra printed output that shows what the random
 			numbers and energies are being used for the Metroplis acceptance criteria
-			during attempted exchanges.
+			during attempted exchanges. Other debug flags can be found in the source code.
 			
-	\item \texttt{CCFLAGS = -O3 -fopenmp \$(DEBUG) -I\$(LAMMPSDIR)}\\
+	\item \texttt{CCFLAGS = -O3 -fopenmp \$(DEBUG) -I\$(LAMMPSSRC)}\\
 			This is for any additional compiler flags for the C compiler. The optimization
 			level is not very important since not much time is actually spent doing computations
 			in the REUS driver, as most of it takes place in LAMMPS. However, you should
-			leave the \texttt{\$(DEBUG) -I\$(LAMMPSDIR)} part in tact. You will need to include
+			leave the \texttt{\$(DEBUG) -I\$(LAMMPSSRC)} part intact. You will need to include
 			OpenMP flags also, where the above example is for gcc style compiler.
 			
 \end{itemize}
@@ -171,9 +204,7 @@ files, which is done by typing (don't do this unless you want to re-compile, tho
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Using LAMMPS Ensembles for Multidimensional REUS}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Modified LAMMPS input file}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 The idea behind LE is to split the MPI universal communicator 
 into separate subcommunicators,
 each of which launches its own LAMMPS run. Each subcommunicator corresponds to a
@@ -185,8 +216,201 @@ to tinker with to find the best acceptance ratio.
 The umbrella sampling bias potential is controlled via the colvars library, for which
 there is extensive documentation online at the LAMMPS website.
 
-Assuming the user has properly set up each replica's input for a usual non-LE run
-with the colvars library, we can now modify it to run with LE. 
+We will discuss the different types of replica exchange possible with LE below.
+The types supported (i.e., ones that are stable) currently are:
+\begin{itemize}
+	\item TEMPER: 	Parallel tempering (i.e., temperature replica exchange).
+	\item REUS:		Replica Exchange Umbrella Sampling for MS-EVB and RAPTOR.
+	\item RELAMBDA:	$\lambda$ Exchange (Hamiltonian exchange) for MS-EVB and RAPTOR, off-diagonal scaling.
+	\item COLVARX:	REUS using the colvars library. (Limited options right now). Not for MS-EVB.
+\end{itemize}
+These are currently all only one-dimensional. Multiple dimensions are being worked on.
+
+The coordinate exchange code (COORDX) is experimental. However, if it were working more properly,
+it would be able to support arbitrary dimensions and many types of Hamiltonian exchange. Currently,
+it only seems to work when only a few (about less than 8) processors are assigned to each replica.
+The issue is that there is some information being lost during coordinate exchange at higher processor
+counts, and this issue is unresolved. If you want to fix it, go for it! Otherwise, use the stable
+replica exchange methods.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{TEMPER}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Parallel tempering, temperature replica exchange.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Modified LAMMPS input file format}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+First and very importantly, comment out
+or delete the \texttt{run \#} command in the LAMMPS input script. If this is not done,
+the LE driver will not work properly. 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{COLVARX}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Replica exchange umbrella sampling using the colvars library. Although multiple dimensions are documented below,
+COLVARX is only stable for one-dimensional REUS currently.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Modified LAMMPS input file format}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+First and very importantly, comment out
+or delete the \texttt{run \#} command in the LAMMPS input script. If this is not done,
+the LE driver will not work properly. 
+
+Secondly, there is a {\em mandatory} line in the input script for Hamiltonian exchange to work properly.
+The line is (put it at the bottom of your LAMMPS input script):
+\begin{verbatim}
+	compute pe all pe
+\end{verbatim}
+It simply adds a compute call for the potential energy to LAMMPS with the identification string ``pe". LE looks
+for this compute in order to get the potential energy after swapping coordinates. Without it, LE will crash.
+
+Thirdly, there are a number of LE tags to place
+at the top of the input file (not required to be at the top, but it is a good place for it). 
+There are 4 relative tag types, discussed in turn below. The syntax is somewhat strict,
+so follow as closely as possible and {\em do not} add extra spaces.
+
+\textbf{The COLVARX tag.}
+This is the main tag that LE looks for in deciding what to do.
+The syntax is as follows:
+\begin{verbatim}
+#COLVARX: fix [F], seed [N]
+\end{verbatim}
+The variables in the square brackets are described here:
+\begin{itemize}
+\item	\texttt{[F]} = A string corresponding to the ID name of the colvar fix
+		in this LAMMPS input script. If \texttt{[F]} = ``none", then the driver does
+		not search for the colvar fix. This is used for unconstrained Hamiltonian exchange
+		or parallel tempering without colvars.
+\item	\texttt{[N]} = An integer. Seeds the random number generator for the Metropolis
+		acceptance criteria.
+		If $\texttt{[N]} = 0$,
+		then the direction of swapping alternates as up/down. Otherwise, the direction of swaps
+		is random. This is meant to be used for debugging purposes.
+\end{itemize}
+
+\textbf{The REPLICA tag.}
+After the COLVARX tag, LE will search for the REPLICA tag to gather information specific
+to the given replica. It's syntax is:
+\begin{verbatim}
+#REPLICA: id [I], ndim [Ndim], temp [T], tdim [TD]
+\end{verbatim}
+The variables in the square brackets are described here:
+\begin{itemize}
+\item	\texttt{[I]} = An integer greater than or equal to zero. The lowest
+		replica index must be zero and should increase by unit increments. That is,
+		the range is 0 to ($n$-1), where $n$ is the number of replicas. This is
+		the index of this replica.
+\item	\texttt{[Ndim]} = An integer corresponding to the number of dimensions
+		in the multidimensional REUS run. Must be 1 or greater.
+\item	\texttt{[T]} = A positive floating point number. The temperature of this replica.
+		It should be the same as the temperature used later in the LAMMPS input script
+		for the NVT ensemble, etc.
+\item	\texttt{[TD]} = An integer. This is the index of the dimension on which to perform
+		parallel tempering (i.e., temperature exchanges). This is optional, and it can only be
+		for one dimension. If you don't want any parallel tempering, set this variable to -1,
+		which informs LE to ignore it.
+\end{itemize}
+
+\textbf{The DIMENSION tag.}
+The next tag(s) to create describe how each exchange dimension should be set up. This
+is controlled via the DIMENSION tag. There are two options for this tag, depending on
+how you want to specify the number of swap attempts.\\
+\textbf{Option 1:}
+\begin{verbatim}
+#DIMENSION: [D] num [NUM] run [RUN] swaps [SWAPS]
+\end{verbatim}
+\textbf{Option 2:}
+\begin{verbatim}
+#DIMENSION: [D] num [NUM] run [RUN] swapfreq [SWAPFREQ]
+\end{verbatim}
+You can have an arbitrary number of DIMENSION tags, each on their own line, as
+long as that number corresponds to [Ndim] for the REPLICA tag. 
+The variables in the square brackets are described here:
+\begin{itemize}
+\item	\texttt{[D]} = An integer greater than or equal to zero. The lowest
+		replica index must be zero and should increase by unit increments. That is,
+		the range is 0 to ($n$-1), where $n$ is the number of replicas. This is
+		the index of this dimension.
+\item	\texttt{[NUM]} = An integer corresponding to the coordinate of this replica
+		along this dimension. In range 0 to ($x$-1), where x is the number of replicas
+		in this dimension.
+\item	\texttt{[RUN]} = A positive integer. How many MD steps in total to take along
+		this dimension.
+\item	\texttt{[SWAPS]} = A positive integer. How many replica exchanges to attempt along this
+		dimension throughout the simulation.
+\item 	\texttt{[SWAPFREQ]} = A positive integer. The frequency of swap attempts. How many MD steps
+		are to be taken between swap attempts. This number must divide \texttt{[RUN]} ({\em i.e.} no remainder).
+\end{itemize}
+
+
+The DIMENSION tags must be consistent across all LAMMPS inputs for each replica. Otherwise,
+the run will fail.
+
+\textbf{The NEIGHBORS tag.}
+Finally, you will need to make a NEIGHBORS tag for each DIMENSION tag, specifying which
+subcommunicators are to act as neighbors in the attempted replica exchanges. Neighbors
+are arbitrary, but if input incorrectly, LE will deadlock in communication. (Efforts
+are underway to automatically detect and report such errors.) The syntax for this
+tag is:
+\begin{verbatim}
+#NEIGHBORS: [D] [M] [P]
+\end{verbatim}
+The variables in the square brackets are described here:
+\begin{itemize}
+\item	\texttt{[D]} = An integer greater than or equal to zero. The lowest
+		replica index must be zero and should increase by unit increments. That is,
+		the range is 0 to ($n$-1), where $n$ is the number of replicas. This is
+		the index of the dimension being described.
+\item   \texttt{[M]} = An integer. The minus direction neighbor subcommunicator
+		index for this dimension. If it is negative, this means that this 
+		replica has no neighbor in the minus direction for this dimension. Otherwise,
+		it must be 0 or greater in the range of subcommunicator indexes.
+\item   \texttt{[P]} = An integer. The plus direction neighbor subcommunicator
+		index for this dimension. If it is negative, this means that this 
+		replica has no neighbor in the plus direction for this dimension. Otherwise,
+		it must be 0 or greater in the range of subcommunicator indexes.
+\end{itemize}
+
+It is possible to define circular dimensions by making appropriate NEIGHBOR tags. For
+example, for a set of three replicas (0, 1, 2, 3), we might have the following NEIGHBOR tags
+in each appropriate LAMMPS input script:
+\begin{verbatim}
+#NEIGHBORS: 0 3 1
+#NEIGHBORS: 0 0 2
+#NEIGHBORS: 0 1 3
+#NEIGHBORS: 0 2 0
+\end{verbatim}
+In order from replica 0 to replica 3, the above would create a circular dimension for four
+replicas.
+
+
+\textbf{Example of tags.}
+Below is a possible example of the LE header for a LAMMPS input script for a one dimensional
+parallel tempering run with the same collective variable in each temperature:
+\begin{verbatim}
+#COLVARX: fix cv, seed 0
+#REPLICA: id 2, ndim 1, temp 275.0, tdim 0
+#DIMENSION: 0 num 2 run 500 swaps 5
+#NEIGHBORS: 0 1 3
+\end{verbatim}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{COORDX}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Experimental coordinate exchange code. Not stable, but documented here anyway. Similar set up to COLVARX.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Modified LAMMPS input file format}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 First and very importantly, comment out
 or delete the \texttt{run \#} command in the LAMMPS input script. If this is not done,
@@ -392,15 +616,7 @@ that each is labelled correspondingly to the LAMMPS inputs for each subcommunica
 \subsection{Examples}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-There are three examples provided in the directory \texttt{examples}. Each uses the
-same molecular system, a small peptide in water with a CHARMM force field. README
-files are provided for each example. There is an example of 1-D REUS, 1-D parallel
-tempering for a single umbrella sampling restraint, and a 2-D REUS/parallel tempering
-example with 16 replicas. Give these a try, and see how it goes. They should work and run in
-a short amount of time.
-
-There is also now an example of 1-D Hamiltonian exchange. This works by having each
-replica use different parameters in the data files.
+There are a handful of examples provided in the directory \texttt{examples}. Try them out!
 
 \end{document}
 
