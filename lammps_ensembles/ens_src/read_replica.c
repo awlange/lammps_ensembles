@@ -50,8 +50,8 @@ void ReadReplica(Replica *this_replica, MPI_Comm subcomm, int split_key, int thi
       Replica tmp;
       tmp.N_dimensions = 0;
       tmp.reus_dim = -1;
-      tmp.temp_dim = -1;
-      tmp.lambda_dim = -1;
+      tmp.temp_dim = -2;
+      tmp.lambda_dim = -3;
       int i;
       int dim = -1;
       int min_neigh, plus_neigh;
@@ -156,7 +156,7 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
 {
       // File syntax:
       // () = Mandatory, [] = optional
-      // #REPLICA: (id) (N_dimensions) (temperature) 
+      // #REPLICA: (id) (N_dimensions) (temperature) [lambda] 
       // #NEIGHBORS: (index of dimension) (minus neighbor) (plus neighbor) 
       
       // Only local rank master reads file 
@@ -174,8 +174,8 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
       Replica tmp;
       tmp.N_dimensions = 0;
       tmp.reus_dim = -1;
-      tmp.temp_dim = -1;
-      tmp.lambda_dim = -1;
+      tmp.temp_dim = -2;
+      tmp.lambda_dim = -3;
       int i;
       int dim = -1;
       int min_neigh, plus_neigh;
@@ -184,10 +184,23 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
       char line[MAX_LENGTH];
       char subline[MAX_LENGTH];
       if (this_local_proc == 0) {
+        int replica_read = 0;
         while ( !feof(fp) ) {
           if ( fgets(line, MAX_LENGTH, fp) != NULL) {
             int run, swap, type;
-            if ( sscanf(line, "#REPLICA: id %d, ndim %d, temp %lf", 
+            if ( sscanf(line, "#REPLICA: id %d, ndim %d, temp %lf, lambda %lf", 
+                        &tmp.id, 
+                        &tmp.N_dimensions, 
+                        &tmp.temperature,
+                        &tmp.lambda) == 4 ) {
+              // Allocate memory 
+              tmp.neighbors  = (int*)malloc( sizeof(int) * tmp.N_dimensions * 2 ); // 2 neighbors in each dimension
+              tmp.dim_run    = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
+              tmp.dim_nevery = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
+              tmp.dim_num    = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
+              replica_read = 1;
+            }
+            else if ( sscanf(line, "#REPLICA: id %d, ndim %d, temp %lf", 
                         &tmp.id, 
                         &tmp.N_dimensions, 
                         &tmp.temperature) == 3 ) {
@@ -196,6 +209,7 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
               tmp.dim_run    = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
               tmp.dim_nevery = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
               tmp.dim_num    = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
+              replica_read = 1;
             }
             else if ( sscanf(line, "#DIMENSION: %d num %d type %d run %d swaps %d", &dim, &num, &type, &run, &swap) == 5 ) {
               // DIMENSION line using number of swaps
@@ -233,6 +247,10 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
           fprintf(stderr, "Error with number of dimensions in file %s\n", input_filename);
           exit(1);
         }
+        if (replica_read == 0) {
+          printf("Did not find a valid #REPLICA line.\n");
+          exit(1);
+        }
         fclose(fp);
         printf("Reading replica information complete on subcomm %d\n", split_key);
       }
@@ -243,6 +261,7 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
       MPI_Bcast(&tmp.id,           1, MPI_INT,    0, subcomm);
       MPI_Bcast(&tmp.N_dimensions, 1, MPI_INT,    0, subcomm);
       MPI_Bcast(&tmp.temperature,  1, MPI_DOUBLE, 0, subcomm);
+      MPI_Bcast(&tmp.lambda,       1, MPI_DOUBLE, 0, subcomm);
       MPI_Bcast(&tmp.temp_dim,     1, MPI_INT,    0, subcomm);
       MPI_Bcast(&tmp.reus_dim,     1, MPI_INT,    0, subcomm);
       MPI_Bcast(&tmp.lambda_dim,   1, MPI_INT,    0, subcomm);
@@ -251,6 +270,7 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
       this_replica->id           = tmp.id;
       this_replica->N_dimensions = tmp.N_dimensions;
       this_replica->temperature  = tmp.temperature;
+      this_replica->lambda       = tmp.lambda;
       this_replica->temp_dim     = tmp.temp_dim;
       this_replica->reus_dim     = tmp.reus_dim;
       this_replica->lambda_dim   = tmp.lambda_dim;
@@ -273,6 +293,14 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
       MPI_Bcast(this_replica->dim_nevery,  tmp.N_dimensions, MPI_INT, 0, subcomm);
       MPI_Bcast(this_replica->dim_num,     tmp.N_dimensions, MPI_INT, 0, subcomm);
 
+      // Check dimensions
+      if ( (this_replica->reus_dim == this_replica->temp_dim) ||
+           (this_replica->reus_dim == this_replica->lambda_dim) ||
+           (this_replica->temp_dim == this_replica->lambda_dim)
+         ) {
+        printf("Error. Cannot have REUS, TEMPER, and/or RELAMBDA in the same dimensions. Check inputs.\n");
+        exit(1);
+      }
 #ifdef MREUS_DEBUG
       // Print the dimension types
       if (this_local_proc == 0) {

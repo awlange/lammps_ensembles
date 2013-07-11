@@ -37,7 +37,7 @@
  */
 
 void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,  
-           char* fix, int seed, int coordtype, int nsteps_short, int dump, 
+           char *EVBfix, char *fix, int seed, int coordtype, int nsteps_short, int dump, 
            Replica *this_replica) {
 
 /*----------------------------------------------------------------------------------
@@ -69,6 +69,7 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 
     int i_replica_id   = this_replica->id;            // replica ID
     double i_temp      = this_replica->temperature;   // initial temperature for this proc
+    double i_lambda    = this_replica->lambda;        // initial lambda scalar
     int i_ndimensions  = this_replica->N_dimensions;  // number of dimensions
     int i_reus_dim     = this_replica->reus_dim;      // which dimension, if any, is the REUS swapping dimension
     int i_temp_dim     = this_replica->temp_dim;      // which dimension, if any, is the temperature swapping dimension
@@ -111,6 +112,15 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     lammps_mod_inst(lmp, 4, NULL, "setup", &i_max_steps);
     //lammps_mod_inst(lmp, 4, NULL, "setup", &i_nsteps);
     lammps_mod_inst(lmp, 0, NULL, "init", NULL);
+
+/*----------------------------------------------------------------------------------
+ * Turn on the lambda flag and set lambda, if necessary
+ */
+   if (i_lambda_dim >= 0) {
+      lammps_modify_EVB_data(lmp, EVBfix, 1, NULL);
+      lammps_modify_EVB_data(lmp, EVBfix, 2, &i_lambda);
+   }
+
 
 /*----------------------------------------------------------------------------------
  * grab boltzmann constant from lammps - depends on user "units" command
@@ -371,167 +381,165 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 	}
 #endif
 
+	//determine number of swaps and check that they divide evenly into run length
+	int div_step  = i_nevery / i_dump;
+	if (div_step < 1) {
+	  if (this_global_proc == 0) {
+	    printf("ERROR.\n");
+	    printf("Swap frequency: %d \n", i_nevery);
+	    printf("Dump frequency: %d \n", i_dump);
+	    printf("swap/dump = %d/%d = %d < 1\n", i_nevery, i_dump, div_step);
+	    printf("swap/dump must be equal to or greater than 1. Please adjust input.\n");
+	  }
+	  MPI_Barrier(MPI_COMM_WORLD);
+	  exit(1);
+	}
 
-        // ** REUS dimension ** //
-        if (idim == i_reus_dim) {
+	// 4. Run for one period of timesteps (regular run)
+        // **** All dimension types do the run here. And all dimensions are capable of using the asynch load balancer. **** //
+	// *** MPI_COMM_WORLD is NOT synced *** //
+	// Run until we hit a dump step again, then dump. This is just to make the steps line up with the dumping below.
+	while (timestep % i_dump != 0) { 
+	  lammps_mod_inst(lmp, 2, "thermo_pe", "addstep", &i_nsteps_short);
+	  lammps_mod_inst(lmp, 3, NULL, "run", &i_nsteps_short); 
+	  current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
+	  timestep = *current_ptr;
+	  if (timestep % i_dump == 0) {
+	    get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
+	    if (this_local_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
+	  }
+	}
+	// Loop over div_step runs till we have run for i_nevery. This is the "regular" run broken into pieces for dumps.
+	int d;
+	for (d=0; d<div_step; d++) {
+	  lammps_mod_inst(lmp, 2, "thermo_pe", "addstep", &i_dump);
+	  lammps_mod_inst(lmp, 3, NULL, "run", &i_dump);
+	  current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
+	  timestep = *current_ptr;
+	  get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
+	  if (this_local_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
+	} 
 
-	    //determine number of swaps and check that they divide evenly into run length
-	    int div_step  = i_nevery / i_dump;
-	    if (div_step < 1) {
-	      if (this_global_proc == 0) {
-		printf("ERROR.\n");
-		printf("Swap frequency: %d \n", i_nevery);
-		printf("Dump frequency: %d \n", i_dump);
-		printf("swap/dump = %d/%d = %d < 1\n", i_nevery, i_dump, div_step);
-		printf("swap/dump must be equal to or greater than 1. Please adjust input.\n");
-	      }
-	      MPI_Barrier(MPI_COMM_WORLD);
-	      exit(1);
-	    }
 
+	if (i_comm != 0 && async) {
+	  // ***** Non-comm 0 guys ***** //
+	  int my_regular_run_finished = 1;
+	  int all_regular_run_finished = 0;
+	  int test_flag = 0;
 
-	    // *** MPI_COMM_WORLD is NOT synced *** //
-	    // 4. run for one period of timesteps (regular run)
-	    //lammps_mod_inst(lmp, 3, NULL, "run", &i_nevery);
-	    //timestep += i_nevery;
-	    // Run until we hit a dump step again, then dump. This is just to make the steps line up with the dumping below.
-	    while (timestep % i_dump != 0) { 
-	      lammps_mod_inst(lmp, 2, "thermo_pe", "addstep", &i_nsteps_short);
-	      lammps_mod_inst(lmp, 3, NULL, "run", &i_nsteps_short); 
-	      current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
-	      timestep = *current_ptr;
-	      if (timestep % i_dump == 0) {
-		get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
-		if (this_local_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
-	      }
-	    }
-	    // Loop over div_step runs till we have run for i_nevery. This is the "regular" run broken into pieces for dumps.
-	    int d;
-	    for (d=0; d<div_step; d++) {
-	      lammps_mod_inst(lmp, 2, "thermo_pe", "addstep", &i_dump);
-	      lammps_mod_inst(lmp, 3, NULL, "run", &i_dump);
-	      current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
-	      timestep = *current_ptr;
+	  // 4.a Inform the root comm that I finished my regular run
+	  MPI_Request my_fin_req;
+	  if (this_local_proc == 0) MPI_Isend(&my_regular_run_finished, 1, MPI_INT, 0, 1, roots, &my_fin_req);
+	  // 4.b Post recieve message from root comm on completion status of everyone else
+	  MPI_Request all_fin_req;
+	  if (this_local_proc == 0) MPI_Irecv(&all_regular_run_finished, 1, MPI_INT, 0, 2, roots, &all_fin_req);
+	  // 4.c Has everyone finished regular run?... 
+	  MPI_Status status1;
+	  if (this_local_proc == 0) MPI_Test(&all_fin_req, &test_flag, &status1);
+	  MPI_Bcast(&test_flag, 1, MPI_INT, 0, subcomm); // Inform my subcomm about test
+	  // 4.c If everyone has not finished the regular run, then do a short asynchronous run until everyone has 
+	  while (!test_flag) {
+	    
+	    lammps_mod_inst(lmp, 2, "thermo_pe", "addstep", &i_nsteps_short);
+	    lammps_mod_inst(lmp, 3, NULL, "run", &i_nsteps_short);
+	    current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
+	    timestep = *current_ptr;
+	    if (timestep % i_dump == 0) {
 	      get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
 	      if (this_local_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
-	    } 
+	    }
+	    if (this_local_proc == 0) MPI_Test(&all_fin_req, &test_flag, &status1);
+	    MPI_Bcast(&test_flag, 1, MPI_INT, 0, subcomm); // Inform my subcomm about test
 
+	  } 
+  
+	} else if (i_comm == 0 && async) {
+	  // ***** Comm 0 master of completions ***** //
 
-	    if (i_comm != 0 && async) {
-	      // ***** Non-comm 0 guys ***** //
-	      int my_regular_run_finished = 1;
-	      int all_regular_run_finished = 0;
-	      int test_flag = 0;
+	  // Create recieve list
+	  MPI_Request* req_list = (MPI_Request*)malloc(sizeof(MPI_Request) * i_ncomms);
+	  int* run_list = (int*)malloc(sizeof(int) * i_ncomms); 
+	  run_list[0] = 1;
+	  for (i=1; i<i_ncomms; ++i) run_list[i] = 0;
 
-	      // 4.a Inform the root comm that I finished my regular run
-	      MPI_Request my_fin_req;
-	      if (this_local_proc == 0) MPI_Isend(&my_regular_run_finished, 1, MPI_INT, 0, 1, roots, &my_fin_req);
-	      // 4.b Post recieve message from root comm on completion status of everyone else
-	      MPI_Request all_fin_req;
-	      if (this_local_proc == 0) MPI_Irecv(&all_regular_run_finished, 1, MPI_INT, 0, 2, roots, &all_fin_req);
-	      // 4.c Has everyone finished regular run?... 
-	      MPI_Status status1;
-	      if (this_local_proc == 0) MPI_Test(&all_fin_req, &test_flag, &status1);
-	      MPI_Bcast(&test_flag, 1, MPI_INT, 0, subcomm); // Inform my subcomm about test
-	      // 4.c If everyone has not finished the regular run, then do a short asynchronous run until everyone has 
-	      while (!test_flag) {
-		
-		lammps_mod_inst(lmp, 2, "thermo_pe", "addstep", &i_nsteps_short);
-		lammps_mod_inst(lmp, 3, NULL, "run", &i_nsteps_short);
-		current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
-		timestep = *current_ptr;
-		if (timestep % i_dump == 0) {
-		  get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
-		  if (this_local_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
-		}
-		if (this_local_proc == 0) MPI_Test(&all_fin_req, &test_flag, &status1);
-		MPI_Bcast(&test_flag, 1, MPI_INT, 0, subcomm); // Inform my subcomm about test
+	  int i_have_recvd_them_all = 0;
+	  if (this_local_proc == 0) {
+	    // Post recieves from all the other comms about regular run completion
+	    for (i=1; i<i_ncomms; ++i) { 
+	      int tmp_num = 0;
+	      MPI_Irecv(&tmp_num, 1, MPI_INT, i, 1, roots, &req_list[i]);
+	    }
+	    // Test the recieves
+	    for (i=1; i<i_ncomms; ++i) {
+	      MPI_Status status;
+	      int flag = 0;
+	      MPI_Test(&req_list[i], &flag, &status);
+	      if (flag) run_list[i] = 1;
+	    }
+	    // Check sum of recieves
+	    int sum = 1;
+	    for (i=1; i<i_ncomms; ++i) sum += run_list[i];
+	    if (sum == i_ncomms) i_have_recvd_them_all = 1;
+	    
+#ifdef MREUS_DEBUG
+	    for (i=0; i<i_ncomms; ++i) printf("run_list[%d] = %d\n", i, run_list[i]);
+#endif
+	  }
+	  MPI_Bcast(&i_have_recvd_them_all, 1, MPI_INT, 0, subcomm); // Inform the other procs in my subcomm
 
-	      } 
-      
-	    } else if (i_comm == 0 && async) {
-	      // ***** Comm 0 master of completions ***** //
+	  // Until we get them all, keep doing short runs
+	  while (!i_have_recvd_them_all) {
 
-	      // Create recieve list
-	      MPI_Request* req_list = (MPI_Request*)malloc(sizeof(MPI_Request) * i_ncomms);
-	      int* run_list = (int*)malloc(sizeof(int) * i_ncomms); 
-	      run_list[0] = 1;
-	      for (i=1; i<i_ncomms; ++i) run_list[i] = 0;
+	    lammps_mod_inst(lmp, 2, "thermo_pe", "addstep", &i_nsteps_short);
+	    lammps_mod_inst(lmp, 3, NULL, "run", &i_nsteps_short);
+	    current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
+	    timestep = *current_ptr;
+	    if (timestep % i_dump == 0) {
+	      get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
+	      if(this_local_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
+	    }
 
-	      int i_have_recvd_them_all = 0;
-	      if (this_local_proc == 0) {
-		// Post recieves from all the other comms about regular run completion
-		for (i=1; i<i_ncomms; ++i) { 
-		  int tmp_num = 0;
-		  MPI_Irecv(&tmp_num, 1, MPI_INT, i, 1, roots, &req_list[i]);
-		}
-		// Test the recieves
-		for (i=1; i<i_ncomms; ++i) {
+	    if (this_local_proc == 0) {
+	      // Test the recieves
+	      for (i=1; i<i_ncomms; ++i) {
+		if (run_list[i] == 0) {
 		  MPI_Status status;
 		  int flag = 0;
 		  MPI_Test(&req_list[i], &flag, &status);
 		  if (flag) run_list[i] = 1;
 		}
-		// Check sum of recieves
-		int sum = 1;
-		for (i=1; i<i_ncomms; ++i) sum += run_list[i];
-		if (sum == i_ncomms) i_have_recvd_them_all = 1;
-		
-#ifdef MREUS_DEBUG
-		for (i=0; i<i_ncomms; ++i) printf("run_list[%d] = %d\n", i, run_list[i]);
-#endif
 	      }
-	      MPI_Bcast(&i_have_recvd_them_all, 1, MPI_INT, 0, subcomm); // Inform the other procs in my subcomm
-
-	      // Until we get them all, keep doing short runs
-	      while (!i_have_recvd_them_all) {
-
-		lammps_mod_inst(lmp, 2, "thermo_pe", "addstep", &i_nsteps_short);
-		lammps_mod_inst(lmp, 3, NULL, "run", &i_nsteps_short);
-		current_ptr = (bigint *)lammps_extract_global(lmp, "ntimestep");
-		timestep = *current_ptr;
-		if (timestep % i_dump == 0) {
-		  get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
-		  if(this_local_proc == 0) write_to_colvar_vec(timestep, bias_dx, h_save, bias_v, i_temp_id, i_comm, my_CVID);
-		}
-
-		if (this_local_proc == 0) {
-		  // Test the recieves
-		  for (i=1; i<i_ncomms; ++i) {
-		    if (run_list[i] == 0) {
-		      MPI_Status status;
-		      int flag = 0;
-		      MPI_Test(&req_list[i], &flag, &status);
-		      if (flag) run_list[i] = 1;
-		    }
-		  }
-		  // Check sum of recieves
-		  int sum = 1;
-		  for (i=1; i<i_ncomms; ++i) sum += run_list[i];
-		  if (sum == i_ncomms) i_have_recvd_them_all = 1;
+	      // Check sum of recieves
+	      int sum = 1;
+	      for (i=1; i<i_ncomms; ++i) sum += run_list[i];
+	      if (sum == i_ncomms) i_have_recvd_them_all = 1;
 
 #ifdef MREUS_DEBUG
-		  for (i=0; i<i_ncomms; ++i) printf("run_list[%d] = %d\n", i, run_list[i]);
+	      for (i=0; i<i_ncomms; ++i) printf("run_list[%d] = %d\n", i, run_list[i]);
 #endif
-		}
-		MPI_Bcast(&i_have_recvd_them_all, 1, MPI_INT, 0, subcomm); // Inform the other procs in my subcomm
-	      } 
-
-	      if (this_local_proc == 0) {
-		// Post blocking sends to all other roots to let them know everyone has finished the regular run
-		int tmp_num = 1;
-		for (i=1; i<i_ncomms; ++i) MPI_Send(&tmp_num, 1, MPI_INT, i, 2, roots);
-#ifdef MREUS_DEBUG
-		printf("All comms have completed their regular run.\n");
-#endif
-	      }
-	      free(req_list);
-	      free(run_list);
 	    }
+	    MPI_Bcast(&i_have_recvd_them_all, 1, MPI_INT, 0, subcomm); // Inform the other procs in my subcomm
+	  } 
 
-	    // Just in case...
-	    MPI_Barrier(MPI_COMM_WORLD);
-	    // *** MPI_COMM_WORLD is now synced *** //
+	  if (this_local_proc == 0) {
+	    // Post blocking sends to all other roots to let them know everyone has finished the regular run
+	    int tmp_num = 1;
+	    for (i=1; i<i_ncomms; ++i) MPI_Send(&tmp_num, 1, MPI_INT, i, 2, roots);
+#ifdef MREUS_DEBUG
+	    printf("All comms have completed their regular run.\n");
+#endif
+	  }
+	  free(req_list);
+	  free(run_list);
+	}
+
+	// Just in case...
+	MPI_Barrier(MPI_COMM_WORLD);
+	// *** MPI_COMM_WORLD is now synced *** //
+
+
+        // ************ REUS dimension ************* //
+        if (idim == i_reus_dim) {
 
 	    // 5. extract current bias information of this instance 
 	    get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
@@ -706,26 +714,155 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 		memcpy(my_CVID, temp_CVID, 50*sizeof(char));
 	    }
 
-	    // 7.5 Count up how many swaps occured for calculating acceptance ratio
-	    if (this_local_proc == 0) {
-	      int sbufi = n_swaps_successful;
-	      int rbufi;
-	      MPI_Reduce(&sbufi, &rbufi, 1, MPI_INT, MPI_SUM, 0, roots);
-	      n_swaps_successful = rbufi / 2; // Divide by two b/c both from pairs added
-	      sbufi = n_swaps_attempted;
-	      MPI_Reduce(&sbufi, &rbufi, 1, MPI_INT, MPI_SUM, 0, roots);
-	      n_swaps_attempted = rbufi / 2; // Divide by two b/c both from pairs added
-	    }
-
-	    // 8. Update lookup table
-	    if (this_local_proc == 0) {
-	      MPI_Allgather(&i_temp_id, 1, MPI_INT, world2tempid, 1, MPI_INT, roots);
-	    }
 
 
-	} // close REUS dimension 
+	} 
+        // ************ RELAMBDA dimension ************* //
+        else if (idim == i_lambda_dim) {
+
+          double partner_energy, partner_lambda;
+
+          // 5. get my current energy and lambda 
+          double my_energy = lammps_extract_EVB_data(lmp, EVBfix, 2, 0);
+          double my_lambda = lammps_extract_EVB_data(lmp, EVBfix, 0, 0);
+#ifdef MREUS_DEBUG
+          if (this_local_proc == 0) printf("Comm %d : my_lambda = %f\n", i_comm, my_lambda);
+#endif
+          // 6. figure out if swap is okay
+          double buffer[2];
+          swap = 0;
+	  n_swaps_attempted = 0;
+	  n_swaps_successful = 0;
+          if (partner_proc != -1) { // if it was left as default -1, skip swap attempt (relevant only to edge replicas 0 and N-1)
+              if (this_local_proc == 0) {
+		  n_swaps_attempted = 1;
+                  if (lower_proc) {
+                      // lower proc recieves information...
+                      MPI_Recv(buffer, 2, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
+                      partner_energy = buffer[0];
+                      partner_lambda = buffer[1];
+                      // then sends information to upper proc
+                      buffer[0] = my_energy;
+                      buffer[1] = my_lambda;
+                      MPI_Send(buffer, 2, MPI_DOUBLE, partner_proc, 1, MPI_COMM_WORLD);
+                  } else {
+                      // higher proc sends bias information to lower proc...
+                      buffer[0] = my_energy;
+                      buffer[1] = my_lambda;
+                      MPI_Send(buffer, 2, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD);
+                      // then recieves bias information from lower proc
+                      MPI_Recv(buffer, 2, MPI_DOUBLE, partner_proc, 1, MPI_COMM_WORLD, &status);
+                      partner_energy = buffer[0];
+                      partner_lambda = buffer[1];
+                  }
+              }
+              // ** Root on subcomm needs to broadcast the new bias information to other procs in the subcomm ** // 
+              // Broadcast LID stuff too
+              MPI_Bcast(&partner_energy, 1, MPI_DOUBLE, 0, subcomm);
+              MPI_Bcast(&partner_lambda, 1, MPI_DOUBLE, 0, subcomm);
+
+              double V_mi, V_mj, V_ni, V_nj;
+              V_mi = V_mj = V_ni = V_nj = 0.0;
+  
+              if (lower_proc) {
+                // lower proc does the m calculations
+                V_mi = my_energy;
+  
+                // compute energy with partner's lambda
+                lammps_modify_EVB_data(lmp, EVBfix, 4, NULL); // turn off writing to evb.out
+                lammps_modify_EVB_data(lmp, EVBfix, 2, &partner_lambda);
+                V_mj = lammps_extract_EVB_data(lmp, EVBfix, 1, 0);
+  
+                // Recieve info from upper proc
+                if (this_local_proc == 0) MPI_Recv(buffer, 2, MPI_DOUBLE, partner_proc, 2, MPI_COMM_WORLD, &status);
+                // Send buffer to subcomm
+                MPI_Bcast(buffer, 2, MPI_DOUBLE, 0, subcomm);
+                V_nj = buffer[0];
+                V_ni = buffer[1];
+                // restore my lambda 
+                lammps_modify_EVB_data(lmp, EVBfix, 2, &my_lambda);
+              }
+              else {
+                // upper proc does the n calculations
+                V_nj = my_energy;
+  
+                // compute energy with partner's lambda
+                lammps_modify_EVB_data(lmp, EVBfix, 4, NULL); // turn off writing to evb.out
+                lammps_modify_EVB_data(lmp, EVBfix, 2, &partner_lambda);
+                V_ni = lammps_extract_EVB_data(lmp, EVBfix, 1, 0);
+  
+                // Send info to lower proc
+                buffer[0] = V_nj;
+                buffer[1] = V_ni;
+                if (this_local_proc == 0) MPI_Send(buffer, 2, MPI_DOUBLE, partner_proc, 2, MPI_COMM_WORLD);
+                // restore my lambda 
+                lammps_modify_EVB_data(lmp, EVBfix, 2, &my_lambda);
+              }
+
+              if (this_local_proc == 0) {
+                if (lower_proc) {
+                    // lower proc does the delta computation
+                    double delta = (V_mj + V_ni) - (V_mi + V_nj);
+                    double my_rand = rng2();
+                    // make decision monte carlo style
+                    if (delta <= 0.0) swap = 1; // criterion of e^0 or greater -> probability of 1
+                    else if (my_rand < exp(-beta * delta)) swap = 1;
+#ifdef MREUS_DEBUG
+                    double prob = 1.0;
+                    if (delta > 0.0) prob = exp(-beta * delta);
+                    printf("comm %d : V_mj = %f V_ni = %f V_mi = %f V_nj = %f delta: %lf, probability: %lf, rand: %lf, swap: %d\n",
+                            i_comm, V_mj, V_ni, V_mi, V_nj, delta, prob, my_rand, swap);
+#endif
+                    // send decision to higher proc
+                    MPI_Send(&swap, 1, MPI_INT, partner_proc, 3, MPI_COMM_WORLD);
+                }
+                else {
+                    MPI_Recv(&swap, 1, MPI_INT, partner_proc, 3, MPI_COMM_WORLD, &status);
+                }
+              }
+              // broadcast decision to subcomm
+              MPI_Bcast(&swap, 1, MPI_INT, 0, subcomm);
+           }
+
+          // 7. perform swap
+          // I currently am set to my partner's lambda from attempted swap above. 
+          // So, only need to restore my lambda if not swapping. ALSO, must recompute energy and force!
+          if (swap == 1) {
+              // Set to partner's lambda 
+              lammps_modify_EVB_data(lmp, EVBfix, 2, &partner_lambda);
+              // reset temp_id
+              i_temp_id = p_temp_id;
+	      n_swaps_successful = 1;
+          }
+          else {
+              // 7.1 Recompute forces in case of altered lambda, no writing to evb.out though 
+              lammps_extract_EVB_data(lmp, EVBfix, 1, 0);
+          }
+          lammps_modify_EVB_data(lmp, EVBfix, 1, NULL); // turn back on writing to evb.out
+
+        }
+        // ************ TEMPER dimension ************* //
+        else if (idim == i_temp_dim) {
+
+        }
+        else {
+          printf("Error with dimensions...\n");
+          exit(1);
+        }
 
 
+
+        /*-------------------------------------------------------------------------*/
+        // swap stats
+	if (this_local_proc == 0) {
+	  int sbufi = n_swaps_successful;
+	  int rbufi;
+	  MPI_Reduce(&sbufi, &rbufi, 1, MPI_INT, MPI_SUM, 0, roots);
+	  n_swaps_successful = rbufi / 2; // Divide by two b/c both from pairs added
+	  sbufi = n_swaps_attempted;
+	  MPI_Reduce(&sbufi, &rbufi, 1, MPI_INT, MPI_SUM, 0, roots);
+	  n_swaps_attempted = rbufi / 2; // Divide by two b/c both from pairs added
+	}
         
         /*-------------------------------------------------------------------------*/
         // Handle any last swapping info stuff here
@@ -737,6 +874,7 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
         if (this_local_proc == 0){
           MPI_Allgather(&i_replica_id, 1, MPI_INT, world2replicaid, 1, MPI_INT, roots);
           for (i=0; i<i_ncomms; i++) replicaid2world[world2replicaid[i]] = i;
+	  MPI_Allgather(&i_temp_id, 1, MPI_INT, world2tempid, 1, MPI_INT, roots);
         }
         MPI_Bcast(replicaid2world, i_ncomms, MPI_INT, 0, subcomm);
 
@@ -821,7 +959,7 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
  * clean it up
  */
 
-    if(this_global_proc == 0) printf("REUS has completed. Cleaning up memory and exiting...\n");
+    if(this_global_proc == 0) printf("MREUS has completed. Cleaning up memory and exiting...\n");
 
     lammps_mod_inst(lmp, 3, NULL, "cleanup", NULL);
     lammps_mod_inst(lmp, 0, NULL, "finish", NULL);

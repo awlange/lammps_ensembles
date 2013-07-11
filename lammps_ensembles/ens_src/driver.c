@@ -249,6 +249,7 @@ int main(int argc, char **argv) {
     int mreusflag = 0;                          // MREUS flag for RAPTOR
     double temp, temp_hi, temp_lo;		// RE temp, SA high and low temp
     char fix[50], file[50];			// fix id, restart binary filename
+    char EVBfix[50];        			// EVB fix id
     char CVID[50];			        // Collecvtive Variable ID 
     int replicaID = -1;                         // replica ID for coordx
     int dump_swap = 0;                          // swap dump file names in temper
@@ -355,7 +356,7 @@ int main(int argc, char **argv) {
                 } else if(relambdaflag) {
                         int n = fscanf(infile, "#RELAMB: LID %s", CVID);
                         n += fscanf(infile, " run %d, swap %d, temp %lf, fix %s",
-                                       &nsteps, &nevery, &temp, fix);
+                                       &nsteps, &nevery, &temp, EVBfix);
                         n += fscanf(infile, " seed %d, lambda %lf",
                                        &sseed, &lambda);
                         if (n != 7) {
@@ -363,8 +364,8 @@ int main(int argc, char **argv) {
                           printf("Wrong number of input fields. Please check that formatting strictly complies.\n");
                           exit(1);
                         }
-                        int len = strlen(fix) - 1;
-                        fix[len] = 0;
+                        int len = strlen(EVBfix) - 1;
+                        EVBfix[len] = 0;
                         len = strlen(CVID) - 1;
                         CVID[len] = 0;
                         bseed = 0; // not used by RELAMBDA, we only need one seed
@@ -385,10 +386,12 @@ int main(int argc, char **argv) {
                         CVID[len] = 0;
                         bseed = 0; // not used by REUS, we only need one seed
 		} else if(mreusflag) {
-		      fscanf(infile, "#MREUS: fix %s seed %d, coordtype %d, short %d, dump %d", 
-                             fix, &sseed, &coordtype, &nsteps_short, &dump);
+		      fscanf(infile, "#MREUS: evb %s fix %s seed %d, coordtype %d, short %d, dump %d", 
+                             EVBfix, fix, &sseed, &coordtype, &nsteps_short, &dump);
 		      int len_fix = strlen(fix) - 1;
 		      fix[len_fix] = 0;
+		      len_fix = strlen(EVBfix) - 1;
+		      EVBfix[len_fix] = 0;
                       // search for replica line for replica id
 		      while( mreusflag == 1 && !feof(infile) ) {	
                         int tmp1;
@@ -423,6 +426,7 @@ int main(int argc, char **argv) {
     MPI_Bcast(&nevery, 1, MPI_INT, 0, subcomm);
     MPI_Bcast(&bseed, 1, MPI_INT, 0, subcomm);
     MPI_Bcast(fix, 50, MPI_CHAR, 0, subcomm);
+    MPI_Bcast(EVBfix, 50, MPI_CHAR, 0, subcomm);
     MPI_Bcast(&dump_swap, 1, MPI_INT, 0, subcomm); 
 
 	// print for error checking and bcast specific values
@@ -488,7 +492,7 @@ int main(int argc, char **argv) {
                 printf("Preparing to run replica exchange lambda simulation:\n");
                 printf("---> Run %d total timesteps\n", nsteps);
                 printf("---> Attempt exchange every %d timesteps\n", nevery);
-                printf("---> Using fix id %s\n", fix);
+                printf("---> Using EVB fix id %s\n", EVBfix);
                 printf("---> Using random seed %d\n", sseed);
             }
             if (this_local_proc == 0) {
@@ -526,9 +530,9 @@ int main(int argc, char **argv) {
             MPI_Bcast(&dump, 1, MPI_INT, 0, subcomm);
             if(this_global_proc == 0) {
                 printf("Preparing to run multi-dimensional replica exchange umbrella sampling simulation:\n");
-                printf("---> Run %d total timesteps\n", nsteps);
                 printf("---> Attempt exchange every %d timesteps\n", nevery);
                 printf("---> Using fix id %s\n", fix);
+                printf("---> Using EVB fix id %s\n", EVBfix);
                 printf("---> Using random seed %d\n", sseed);
                 printf("---> Using coordinate type %d\n", coordtype);
                 printf("---> Run %d short timesteps\n", nsteps_short);
@@ -717,7 +721,7 @@ int main(int argc, char **argv) {
     	    printf("---> Beginning MREUS...\n\n"); 
 
         if (!skip_run) {
-           mreus(lmp, subcomm, n_comms, split_key, fix, sseed, coordtype, nsteps_short, dump, &this_replica); 
+           mreus(lmp, subcomm, n_comms, split_key, EVBfix, fix, sseed, coordtype, nsteps_short, dump, &this_replica); 
         }
 
         // ** Free replica array ** //
@@ -729,7 +733,7 @@ int main(int argc, char **argv) {
         if (this_global_proc == 0)
             printf("---> Beginning replica exchange lambda simulation at temperature %f \n", temp);
 
-       relambda(lmp, subcomm, CVID, nsteps, nevery, n_comms, split_key, temp, fix, sseed, lambda);
+       relambda(lmp, subcomm, CVID, nsteps, nevery, n_comms, split_key, temp, EVBfix, sseed, lambda);
     }
     else if(reusflag) {
         if (this_global_proc == 0)

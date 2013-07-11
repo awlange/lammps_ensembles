@@ -76,18 +76,18 @@ void relambda(void *lmp, MPI_Comm subcomm, char* LID, int nsteps, int nevery, in
       printf("Will run for %d swap steps.\n", i_nswaps);
 
 /*----------------------------------------------------------------------------------
- * Turn on the lambda flag and set lambda
- */
-    lammps_modify_EVB_data(lmp, fix, 1, NULL);
-    lammps_modify_EVB_data(lmp, fix, 2, &i_lambda);
-
-
-/*----------------------------------------------------------------------------------
  * setup update and initialize lammps
  */
  
     lammps_mod_inst(lmp, 4, NULL, "setup", &i_nsteps);
     lammps_mod_inst(lmp, 0, NULL, "init", NULL);
+
+/*----------------------------------------------------------------------------------
+ * Turn on the lambda flag and set lambda
+ */
+    lammps_modify_EVB_data(lmp, fix, 1, NULL);
+    lammps_modify_EVB_data(lmp, fix, 2, &i_lambda);
+
 
 /*----------------------------------------------------------------------------------
  * grab boltzmann constant from lammps - depends on user "units" command
