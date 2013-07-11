@@ -54,7 +54,7 @@ void colvar_exchange(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     MPI_Comm_rank(MPI_COMM_WORLD, &this_global_proc);
 
 #ifdef COORDX_DEBUG_LEVEL_TWO
-    if (this_global_proc == 0) printf("Now in colvar.c\n");
+    if (this_global_proc == 0) printf("Now in colvar_exchange.c\n");
 #endif
 
 /*----------------------------------------------------------------------------------

@@ -17,8 +17,8 @@ LIBDIR =
 LIB = -llammps_mac_awgl -L$(LIBCOLVARS) -lcolvars 
 
 # Debugging flags
-#DEBUG = -g -DRELAMBDA_DEBUG 
-DEBUG = -g
+DEBUG = -g -DMREUS_DEBUG
+#DEBUG = -g
 
 # Compiler flags, optimizations
 CCFLAGS = -O3 -fopenmp $(DEBUG) -I$(LAMMPSSRC) 

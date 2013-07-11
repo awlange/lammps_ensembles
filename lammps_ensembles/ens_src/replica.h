@@ -40,6 +40,11 @@ typedef int64_t bigint;
 typedef int tagint;
 #define MPI_LMP_TAGINT MPI_INT
 
+// Dimension types
+#define DIM_NONE    0
+#define DIM_REUS    1
+#define DIM_TEMPER  2
+#define DIM_LAMBDA  3 
 
 /*
  *  Data structure for a replica
@@ -50,8 +55,9 @@ typedef struct {
   int id;               // Identification number for this replica
   int N_dimensions;     // Number of dimensions this replica can exchange along
   double temperature;   // Temperature of this replica
+  int reus_dim;         // Dimension for REUS 
   int temp_dim;         // Dimension for temperature exchange
-  int scale_dim;        // Dimension for scaling exchange (i.e. lambda exchange)
+  int lambda_dim;       // Dimension for scaling exchange (i.e. lambda exchange)
   int *neighbors;       // List of neighbors in each dimension. Restricted to 2 neighbors (+ and -)
   int *dim_num;         // Dimension index for each dimension, starts at 0 
   int *dim_run;         // How long to run for each dimension
@@ -86,7 +92,8 @@ void write_to_colvar_init(double, double, int);
 void write_to_colvar(double, double, double, int, int);
 void write_to_colvar_init_vec(double*, double*, double*, int, char*);
 void write_to_colvar_vec(bigint, double*, double, double, int, int, char*);
-void get_umbrella_data(void*, char*, double*, double*, double*, double*, double*, double*);
+void get_umbrella_data(void*, char*, double*, double*, double*, double*, double*, double*, int);
+void mreus (void *, MPI_Comm, int, int, char *, int, int, int, int, Replica *);
 
 
 

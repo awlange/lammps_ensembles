@@ -246,6 +246,7 @@ int main(int argc, char **argv) {
     int colvarxflag = 0;                        // Colvar exchange
     int relambdaflag = 0;                       // Lambda scaling exchange for RAPTOR
     int reusflag = 0;                           // REUS flag for RAPTOR
+    int mreusflag = 0;                          // MREUS flag for RAPTOR
     double temp, temp_hi, temp_lo;		// RE temp, SA high and low temp
     char fix[50], file[50];			// fix id, restart binary filename
     char CVID[50];			        // Collecvtive Variable ID 
@@ -273,7 +274,7 @@ int main(int argc, char **argv) {
 
 		// search for TEMPER or ANNEAL line by checking first 9 chars
                 int flag_sum = temperflag + annealflag + coordxflag 
-                               + colvarxflag + relambdaflag + reusflag;
+                               + colvarxflag + relambdaflag + reusflag + mreusflag;
 		while( flag_sum == 0 && !feof(infile) ) {	
 			fgetpos(infile, &position);	// store position
 			fgets(command, 9, infile);	// read in 9 chars
@@ -285,8 +286,9 @@ int main(int argc, char **argv) {
 			else if(strcmp(command, "#COLVARX") == 0) colvarxflag = 1;
 			else if(strcmp(command, "#RELAMB:") == 0) relambdaflag = 1;
 			else if(strcmp(command, "#REUS:  ") == 0) reusflag = 1;
+			else if(strcmp(command, "#MREUS: ") == 0) mreusflag = 1;
                         flag_sum = temperflag + annealflag + coordxflag 
-                                   + colvarxflag + relambdaflag + reusflag;
+                                   + colvarxflag + relambdaflag + reusflag + mreusflag;
 		}
 
 		// come back to beginning of line
@@ -382,6 +384,27 @@ int main(int argc, char **argv) {
                         len = strlen(CVID) - 1;
                         CVID[len] = 0;
                         bseed = 0; // not used by REUS, we only need one seed
+		} else if(mreusflag) {
+		      fscanf(infile, "#MREUS: fix %s seed %d, coordtype %d, short %d, dump %d", 
+                             fix, &sseed, &coordtype, &nsteps_short, &dump);
+		      int len_fix = strlen(fix) - 1;
+		      fix[len_fix] = 0;
+                      // search for replica line for replica id
+		      while( mreusflag == 1 && !feof(infile) ) {	
+                        int tmp1;
+                        double tmp2;
+			fgetpos(infile, &position);	// store position
+			fgets(command, 10, infile);	// read in 10 chars
+			fscanf(infile, "\n");		// move to end of line
+			if ( strcmp(command, "#REPLICA:") == 0) { 
+		          // come back to beginning of line
+		          fsetpos(infile, &position);
+  			  if ( fscanf(infile, "#REPLICA: id %d, ndim %d, temp %lf", 
+                                      &replicaID, &tmp1, &tmp2) == 3) {
+                            mreusflag = 2;
+                          }
+                        }
+                      }
                 }
 		
         fclose(infile);
@@ -394,6 +417,7 @@ int main(int argc, char **argv) {
     MPI_Bcast(&colvarxflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&relambdaflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&reusflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&mreusflag, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	
     MPI_Bcast(&nsteps, 1, MPI_INT, 0, subcomm);
     MPI_Bcast(&nevery, 1, MPI_INT, 0, subcomm);
@@ -493,13 +517,32 @@ int main(int argc, char **argv) {
                 printf("---> Subcomm %d will use %s as its CVID\n", gproc_lcomm[this_global_proc], CVID);
             }
 
+        } else if(mreusflag) {
+
+            MPI_Bcast(&sseed, 1, MPI_INT, 0, subcomm);
+            MPI_Bcast(&temp, 1, MPI_DOUBLE, 0, subcomm);
+            MPI_Bcast(&coordtype, 1, MPI_INT, 0, subcomm);
+            MPI_Bcast(&nsteps_short, 1, MPI_INT, 0, subcomm);
+            MPI_Bcast(&dump, 1, MPI_INT, 0, subcomm);
+            if(this_global_proc == 0) {
+                printf("Preparing to run multi-dimensional replica exchange umbrella sampling simulation:\n");
+                printf("---> Run %d total timesteps\n", nsteps);
+                printf("---> Attempt exchange every %d timesteps\n", nevery);
+                printf("---> Using fix id %s\n", fix);
+                printf("---> Using random seed %d\n", sseed);
+                printf("---> Using coordinate type %d\n", coordtype);
+                printf("---> Run %d short timesteps\n", nsteps_short);
+                printf("---> Dump COLVAR data every %d time steps\n", dump);
+            }
+            MPI_Bcast(&replicaID, 1, MPI_INT, 0, subcomm);
+
 	} else {		
                 // could not find tag 
 		if(this_global_proc == 0) {
 			printf("No multi-replica simulation specificied in input script.\n");
 			printf("Please specifiy a simulation.\n");
                         printf("Valid options are (whitespace sensitive):\n");
-                        printf("'#TEMPER: ', '#ANNEAL: ', '#COORDX: ', '#COLVARX: ', '#RELAMB: ', '#REUS:   '\n"); 
+                        printf("'#TEMPER: ', '#ANNEAL: ', '#COORDX: ', '#COLVARX: ', '#RELAMB: ', '#REUS:   ', '#MREUS:  ''\n"); 
 			printf("Exiting.\n\n");
 			exit(1);
 		}
@@ -533,7 +576,7 @@ int main(int argc, char **argv) {
       sprintf(str3_log,"log.cv.%s", CVID);
     } else if (relambdaflag) {
       sprintf(str3_log,"log.id.%s", CVID);
-    } else if (coordxflag || colvarxflag) {
+    } else if (coordxflag || colvarxflag || mreusflag) {
       sprintf(str3_log,"log.id.%d", replicaID);
     } else {
       // Default to split key labelling
@@ -653,6 +696,28 @@ int main(int argc, char **argv) {
         if (!skip_run) {
            if (coordxflag)  coord_exchange(lmp, subcomm, n_comms, split_key, &this_replica, fix, sseed); 
            if (colvarxflag) colvar_exchange(lmp, subcomm, n_comms, split_key, &this_replica, fix, sseed); 
+        }
+
+        // ** Free replica array ** //
+        free(this_replica.neighbors);
+        free(this_replica.dim_run);
+        free(this_replica.dim_nevery);
+    }
+    else if(mreusflag) {
+ 
+        // ** Set up the replica data structure here ** //
+        Replica this_replica;
+        if (read_input_flag) {
+          ReadReplicaMREUS(&this_replica, subcomm, split_key, this_local_proc, inputfiles[my_file]);
+        } else {
+          ReadReplicaMREUS(&this_replica, subcomm, split_key, this_local_proc, argv[my_file]);
+        }
+
+    	if (this_global_proc == 0) 
+    	    printf("---> Beginning MREUS...\n\n"); 
+
+        if (!skip_run) {
+           mreus(lmp, subcomm, n_comms, split_key, fix, sseed, coordtype, nsteps_short, dump, &this_replica); 
         }
 
         // ** Free replica array ** //
