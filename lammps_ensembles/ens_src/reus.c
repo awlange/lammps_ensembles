@@ -548,7 +548,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
 	      // lower proc does the m calculations
               V_mi = bias_v; // used from above 
               // compute bias with partner's bias
-              lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_partner_xa0);
+              lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_xa0);
               V_mj = lammps_extract_umbrella_data(lmp, fix, -1, 0);
               if (this_proc == 0) {
                 // Recieve info from upper proc
@@ -562,7 +562,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
               // upper proc does the n calculations
               V_nj = bias_v; // used from above                  
               // compute bias with partner's bias
-              lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_partner_xa0);
+              lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_xa0);
               V_ni = lammps_extract_umbrella_data(lmp, fix, -1, 0); 
               // Send info to lower proc
               buffer[0] = V_nj;
