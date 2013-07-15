@@ -286,8 +286,8 @@ void temper(void *lmp, MPI_Comm subcomm, int nsteps, int nevery, int ncomms,
 
             if (dump_swap) {
               // swap dump file names for convenience in post-processing
-              strcpy(my_dumpfile, lammps_get_dump_file(lmp));
-              if (my_dumpfile != NULL) {
+              if (lammps_get_dump_file(lmp) != NULL) {
+                strcpy(my_dumpfile, lammps_get_dump_file(lmp));
                 if (this_proc == 0) {
                     MPI_Sendrecv(my_dumpfile,      MAXCHARS, MPI_CHAR, partner_proc, 0,
                                  partner_dumpfile, MAXCHARS, MPI_CHAR, partner_proc, 0, MPI_COMM_WORLD, &status);
