@@ -737,7 +737,7 @@ void FixUmbrella::compute_bias_stuff_for_external(double *k_mod, double *ref_mod
           ff[i] = -k_mod[i];
           f[0][i] = - k_mod[i] * dx[i]; f[1][i] = -f[0][i];
           dx2[i] = dx[i]*dx[i];
-          energy += 0.5 * k_mod[i] * dx2[i];
+          bias_energy += 0.5 * k_mod[i] * dx2[i];
     }
 #else
     // ** Normal code ** //
