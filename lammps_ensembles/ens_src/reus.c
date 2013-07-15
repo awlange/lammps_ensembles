@@ -36,7 +36,7 @@
  */
 
 void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int ncomms, int comm, double temp, 
-          char* fix, int seed, int coordtype, int nsteps_short, int dump) {
+          char* fix, int seed, int coordtype, int nsteps_short, int dump, int dump_swap) {
 
 /*----------------------------------------------------------------------------------
  * MPI things
@@ -219,6 +219,10 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
 
     MPI_Status status;
     double beta = 1.0 / (boltz * i_temp);
+
+    // For swapping output file names
+    char *my_dumpfile      = (char *)malloc(sizeof(char) * MAXCHARS);
+    char *partner_dumpfile = (char *)malloc(sizeof(char) * MAXCHARS);
 
     // Grab umbrella data
     get_umbrella_data(lmp, fix, bias_dx, bias_ref, bias_kappa, bias_xa0, &bias_v, &h_save, coordtype);
@@ -580,7 +584,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
                   else if(my_rand < exp(-beta * delta)) swap = 1; 
 #ifdef REUS_DEBUG
                   double prob = 1.0;
-                  if(delta > 0.0) prob = exp(-delta);
+                  if(delta > 0.0) prob = exp(-beta * delta);
 	          printf("V_mj = %f V_ni = %f V_mi = %f V_nj = %f delta: %lf, probability: %lf, rand: %lf, swap: %d\n", 
                           V_mj, V_ni, V_mi, V_nj, delta, prob, my_rand, swap);
 #endif
@@ -623,6 +627,22 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
 
             // reset CVID
             memcpy(my_CVID, temp_CVID, 50*sizeof(char));
+
+            if (dump_swap) {
+              // swap dump file names for convenience in post-processing
+              if (lammps_get_dump_file(lmp) != NULL) {
+                strcpy(my_dumpfile, lammps_get_dump_file(lmp));
+                if (this_proc == 0) {
+                    MPI_Sendrecv(my_dumpfile,      MAXCHARS, MPI_CHAR, partner_proc, 0,
+                                 partner_dumpfile, MAXCHARS, MPI_CHAR, partner_proc, 0, MPI_COMM_WORLD, &status);
+                }
+                MPI_Bcast(partner_dumpfile, MAXCHARS, MPI_CHAR, 0, subcomm);
+                lammps_change_dump_file(lmp, i_comm, partner_dumpfile);
+              } else {
+               printf("Error: No dump file specified for TEMPER module to swap. Check inputs.\n");
+               exit(1);
+              }
+            }
         }
 
         // 7.5 Count up how many swaps occured for calculating acceptance ratio
@@ -727,6 +747,9 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
     // ** Free the world maps ** // 
     free(world2root);
     free(world2tempid);
+
+    free(my_dumpfile);
+    free(partner_dumpfile);
 }
 
 

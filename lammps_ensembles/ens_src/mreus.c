@@ -68,7 +68,6 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     this_replica->comm = i_comm;        // instance ID for this replica
 
     int i_replica_id   = this_replica->id;            // replica ID
-    double i_temp      = this_replica->temperature;   // initial temperature for this proc
     double i_lambda    = this_replica->lambda;        // initial lambda scalar
     int i_ndimensions  = this_replica->N_dimensions;  // number of dimensions
     int i_reus_dim     = this_replica->reus_dim;      // which dimension, if any, is the REUS swapping dimension
@@ -192,7 +191,7 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     // replicaid2temp - return given temperature for a given replica id
     double *replicaid2temp = (double *)malloc(sizeof(double) * i_ncomms);
     if(this_local_proc == 0)
-        MPI_Allgather(&i_temp, 1, MPI_DOUBLE, replicaid2temp, 1, MPI_DOUBLE, roots);
+        MPI_Allgather(&this_replica->temperature, 1, MPI_DOUBLE, replicaid2temp, 1, MPI_DOUBLE, roots);
     MPI_Bcast(replicaid2temp, i_ncomms, MPI_DOUBLE, 0, subcomm);
 
     // replicaid2world - return subcomm for a given replica_id
@@ -211,6 +210,21 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     if (this_local_proc == 0) {
       MPI_Allgather(&i_temp_id, 1, MPI_INT, world2tempid, 1, MPI_INT, roots);
     }
+
+    // world2temperature - return the temperature for a given world 
+    double *world2temperature = (double *)malloc(sizeof(double) * i_ncomms);
+    if (this_local_proc == 0) {
+      MPI_Allgather(&this_replica->temperature, 1, MPI_DOUBLE, world2temperature, 1, MPI_DOUBLE, roots);
+    }
+    MPI_Bcast(world2temperature, i_ncomms, MPI_DOUBLE, 0, subcomm);
+#ifdef MREUS_DEBUG
+    if (this_global_proc == 0) {
+      printf("Initial temperature configuration:\n");
+      for (i=0; i<i_ncomms; i++) {
+        printf("%d : %f\n", i, world2temperature[i]);
+      }
+    }
+#endif
 
     // Temporary CVID
     char temp_CVID[50];
@@ -240,7 +254,6 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
  */
 
     int iswap, swap, dir, p_temp_id, partner_proc, partner_comm, lower_proc;
-    // Information to compute bias potentials : V_{bias} = \frac{1}{2} \kappa (x - x_0)^{2}
     double bias_v;                                // my current bias potential 
     double bias_dx[3], bias_partner_dx[3];        // current position along collective variable
     double bias_ref[3], bias_partner_ref[3];      // equilibrium position for collective variable (this is what gets swapped!)
@@ -251,7 +264,6 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     double h_save;
 
     MPI_Status status;
-    double beta = 1.0 / (boltz * i_temp);
 
     // For swapping output file names
     char *my_dumpfile      = (char *)malloc(sizeof(char) * MAXCHARS);
@@ -321,8 +333,11 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
         // Set data for this dimension
         i_nevery = this_replica->dim_nevery[idim];
 	swap = 0;
+	n_swaps_attempted = 0;
+	n_swaps_successful = 0;
         sprintf(CVID, "%d", i_replica_id);
         memcpy(my_CVID, CVID, 50*sizeof(char));
+        double beta = 1.0 / (boltz * this_replica->temperature); 
 
 #ifdef MREUS_DEBUG
         if (this_global_proc == 0) {
@@ -550,8 +565,6 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
       
 	    // 6. figure out if swap is okay
 	    double buffer[12];
-	    n_swaps_attempted = 0;
-	    n_swaps_successful = 0;
 	    if (partner_proc != -1) { // if it was left as default -1, skip swap attempt (relevant only to edge replicas 0 and N-1)
 		if (this_local_proc == 0) {
 		    n_swaps_attempted = 1;
@@ -687,8 +700,6 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 	    // 7. perform swap
 	    if(swap == 1) {
 
-		n_swaps_successful = 1;
-
 		// Modify which bias I now have. Change it to my partner's.
 		lammps_modify_umbrella_data(lmp, fix, 1, bias_partner_ref);  
 		lammps_modify_umbrella_data(lmp, fix, 2, bias_partner_kappa);  
@@ -711,9 +722,6 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 		//  	bias_ref[0], bias_ref[1], bias_ref[2], after[0], after[1], after[2]);
                 //}
 #endif
-		// reset temp_id
-		i_temp_id = p_temp_id;
-
 		// reset CVID
 		memcpy(my_CVID, temp_CVID, 50*sizeof(char));
 	    }
@@ -732,9 +740,6 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 #endif
           // 6. figure out if swap is okay
           double buffer[2];
-          swap = 0;
-	  n_swaps_attempted = 0;
-	  n_swaps_successful = 0;
           if (partner_proc != -1) { // if it was left as default -1, skip swap attempt (relevant only to edge replicas 0 and N-1)
               if (this_local_proc == 0) {
 		  n_swaps_attempted = 1;
@@ -832,9 +837,6 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
           if (swap == 1) {
               // Set to partner's lambda 
               lammps_modify_EVB_data(lmp, EVBfix, 2, &partner_lambda);
-              // reset temp_id
-              i_temp_id = p_temp_id;
-	      n_swaps_successful = 1;
           }
           else {
               // 7.1 Recompute forces in case of altered lambda, no writing to evb.out though 
@@ -846,32 +848,70 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 
         // ************ TEMPER dimension ************* //
         else if (idim == i_temp_dim) {
+          if (partner_proc != -1) {
+            // Extract the potential energy for parallel tempering
+            // Note: In case of REUS, the bias potential cancels in deltaE for TEMPER dimension, so only need potential energy
+            double *pe_ptr = (double *)lammps_extract_compute(lmp, "thermo_pe", 0, 0);
+            double pe = *pe_ptr;
+            double pe_partner;
 
+            if (this_local_proc == 0) {
+                n_swaps_attempted = 1;
+                if (this_global_proc > partner_proc) {
+                  // higher proc sends pe to lower proc
+                  MPI_Send(&pe, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD);
+                } else {
+                  // lower proc recieves
+                  MPI_Recv(&pe_partner, 1, MPI_DOUBLE, partner_proc, 0, MPI_COMM_WORLD, &status);
+                }
+                // lower proc does calculations
+                if (this_global_proc < partner_proc) {
+                    double delta = (pe_partner - pe) *
+                                   (1.0 / (boltz * world2temperature[partner_comm]) -
+                                    1.0 / (boltz * world2temperature[i_comm]));
+                    double my_rand = rng2();
+                    // make decision monte carlo style
+                    if (delta >= 0.0) swap = 1; // criterion of e^0 or greater -> probability of 1
+                    else if (my_rand < exp(delta)) swap = 1;
+#ifdef MREUS_DEBUG
+                    double prob = exp(delta);
+                    if (delta >= 0.0) prob = 1.0;
+                    printf("%d<-->%d pe: %lf p_pe: %lf  delta: %lf, probability: %f, rand: %lf swap: %d\n",
+                            i_comm, partner_comm, pe, pe_partner, delta, prob, my_rand, swap);
+#endif              
+                }
+                // send decision to higher proc
+                if (this_global_proc < partner_proc) {
+                    MPI_Send(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD);
+                } else {
+                    MPI_Recv(&swap, 1, MPI_INT, partner_proc, 0, MPI_COMM_WORLD, &status);
+                }
+            }
+            if (swap) {
+              // scale velocities
+              lammps_scale_velocities(lmp, world2temperature[i_comm], world2temperature[partner_comm]); 
+              // reset thermostat temp
+              lammps_mod_inst(lmp, 1, fix, "reset_target", &world2temperature[partner_comm]);
+              // change replica temperature
+              this_replica->temperature = world2temperature[partner_comm]; 
+            }
+
+          }
         }
         else {
           printf("Error with dimensions...\n");
           exit(1);
         }
 
-
-
-        /*-------------------------------------------------------------------------*/
-        // swap stats
-	if (this_local_proc == 0) {
-	  int sbufi = n_swaps_successful;
-	  int rbufi;
-	  MPI_Reduce(&sbufi, &rbufi, 1, MPI_INT, MPI_SUM, 0, roots);
-	  n_swaps_successful = rbufi / 2; // Divide by two b/c both from pairs added
-	  sbufi = n_swaps_attempted;
-	  MPI_Reduce(&sbufi, &rbufi, 1, MPI_INT, MPI_SUM, 0, roots);
-	  n_swaps_attempted = rbufi / 2; // Divide by two b/c both from pairs added
-	}
         
         /*-------------------------------------------------------------------------*/
         // Handle any last swapping info stuff here
         if (swap == 1) {
+          n_swaps_successful = 1;
           i_replica_id = p_replica_id;
           this_replica->id = i_replica_id;
+          // reset temp_id
+          i_temp_id = p_temp_id;
           if (dump_swap) {
             // swap dump file names for convenience in post-processing
             if (lammps_get_dump_file(lmp) != NULL) {
@@ -888,13 +928,28 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
             }
           }
         }
-        // Update lookup table
+        // Update lookup tables
         if (this_local_proc == 0){
           MPI_Allgather(&i_replica_id, 1, MPI_INT, world2replicaid, 1, MPI_INT, roots);
           for (i=0; i<i_ncomms; i++) replicaid2world[world2replicaid[i]] = i;
 	  MPI_Allgather(&i_temp_id, 1, MPI_INT, world2tempid, 1, MPI_INT, roots);
+          MPI_Allgather(&this_replica->temperature, 1, MPI_DOUBLE, world2temperature, 1, MPI_DOUBLE, roots);
         }
         MPI_Bcast(replicaid2world, i_ncomms, MPI_INT, 0, subcomm);
+        MPI_Bcast(world2temperature, i_ncomms, MPI_DOUBLE, 0, subcomm);
+
+
+        /*-------------------------------------------------------------------------*/
+        // swap stats
+	if (this_local_proc == 0) {
+	  int sbufi = n_swaps_successful;
+	  int rbufi;
+	  MPI_Reduce(&sbufi, &rbufi, 1, MPI_INT, MPI_SUM, 0, roots);
+	  n_swaps_successful = rbufi / 2; // Divide by two b/c both from pairs added
+	  sbufi = n_swaps_attempted;
+	  MPI_Reduce(&sbufi, &rbufi, 1, MPI_INT, MPI_SUM, 0, roots);
+	  n_swaps_attempted = rbufi / 2; // Divide by two b/c both from pairs added
+	}
 
 
 	// Timer
@@ -921,7 +976,7 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
           average_acceptance_ratio += acceptance_ratio;
           int s;
           for (s=0; s<i_ncomms; ++s) {
-            printf("  Subcomm %d : id = %d \n", s, world2replicaid[s]);
+            printf("  Subcomm %d : id = %d\n", s, world2replicaid[s]);
           }
         }
 
@@ -991,5 +1046,6 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
     free(replicaid2world);
     free(my_dumpfile);
     free(partner_dumpfile);
+    free(world2temperature);
 }
 

@@ -375,7 +375,7 @@ int main(int argc, char **argv) {
                                        &nsteps, &nevery, &temp, fix);
                         n += fscanf(infile, " seed %d, coordtype %d, short %d, dump %d, dump_swap %d",
                                        &sseed, &coordtype, &nsteps_short, &dump, &dump_swap);
-                        if (n != 9) {
+                        if (n != 10) {
                           printf("Problem reading #REUS line on subcomm %d.\n", gproc_lcomm[this_global_proc]);
                           printf("Wrong number of input fields. Please check that formatting strictly complies.\n");
                           exit(1);
@@ -386,12 +386,17 @@ int main(int argc, char **argv) {
                         CVID[len] = 0;
                         bseed = 0; // not used by REUS, we only need one seed
 		} else if(mreusflag) {
-		      fscanf(infile, "#MREUS: evb %s fix %s seed %d, coordtype %d, short %d, dump %d, dump_swap %d", 
-                             EVBfix, fix, &sseed, &coordtype, &nsteps_short, &dump, &dump_swap);
+		      int n = fscanf(infile, "#MREUS: evb %s fix %s seed %d, coordtype %d, short %d, dump %d, dump_swap %d", 
+                                     EVBfix, fix, &sseed, &coordtype, &nsteps_short, &dump, &dump_swap);
 		      int len_fix = strlen(fix) - 1;
 		      fix[len_fix] = 0;
 		      len_fix = strlen(EVBfix) - 1;
 		      EVBfix[len_fix] = 0;
+                      if (n != 7) {
+                          printf("Problem reading #MREUS line on subcomm %d.\n", gproc_lcomm[this_global_proc]);
+                          printf("Wrong number of input fields. Please check that formatting strictly complies.\n");
+                          exit(1);
+                      }
                       // search for replica line for replica id
 		      while( mreusflag == 1 && !feof(infile) ) {	
                         int tmp1;

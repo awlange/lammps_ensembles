@@ -203,7 +203,7 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
             else if ( sscanf(line, "#REPLICA: id %d, ndim %d, temp %lf", 
                         &tmp.id, 
                         &tmp.N_dimensions, 
-                        &tmp.temperature) == 3 ) {
+                        &tmp.temperature ) == 3 ) {
               // Allocate memory 
               tmp.neighbors  = (int*)malloc( sizeof(int) * tmp.N_dimensions * 2 ); // 2 neighbors in each dimension
               tmp.dim_run    = (int*)malloc( sizeof(int) * tmp.N_dimensions ); 
@@ -216,7 +216,6 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
               tmp.dim_run[dim] = run;
               tmp.dim_nevery[dim] = run / swap;
               tmp.dim_num[dim] = num;
-              printf("type = %d dim = %d\n", type, dim);
               if      (type == DIM_REUS)   tmp.reus_dim = dim;
               else if (type == DIM_TEMPER) tmp.temp_dim = dim;
               else if (type == DIM_LAMBDA) tmp.lambda_dim = dim;
