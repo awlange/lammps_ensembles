@@ -703,24 +703,17 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 		// Modify which bias I now have. Change it to my partner's.
 		lammps_modify_umbrella_data(lmp, fix, 1, bias_partner_ref);  
 		lammps_modify_umbrella_data(lmp, fix, 2, bias_partner_kappa);  
-		lammps_modify_umbrella_data(lmp, fix, 4, bias_partner_xa0);  
+		//lammps_modify_umbrella_data(lmp, fix, 4, bias_partner_xa0);  
 
 #ifdef MREUS_DEBUG
 		double after[3];
-		after[0] = lammps_extract_umbrella_data(lmp, fix, 4, 0);
-		after[1] = lammps_extract_umbrella_data(lmp, fix, 4, 1);
-		after[2] = lammps_extract_umbrella_data(lmp, fix, 4, 2);
+		after[0] = lammps_extract_umbrella_data(lmp, fix, 1, 0);
+		after[1] = lammps_extract_umbrella_data(lmp, fix, 1, 1);
+		after[2] = lammps_extract_umbrella_data(lmp, fix, 1, 2);
 	        if (this_local_proc == 0) {
-		  printf("Comm %d xa0: before = %f %f %f after = %f %f %f\n", i_comm, 
-		          bias_xa0[0], bias_xa0[1], bias_xa0[2], after[0], after[1], after[2]);
+		  printf("Comm %d ref: before = %f %f %f after = %f %f %f\n", i_comm, 
+		  	bias_ref[0], bias_ref[1], bias_ref[2], after[0], after[1], after[2]);
                 }
-		//after[0] = lammps_extract_umbrella_data(lmp, fix, 1, 0);
-		//after[1] = lammps_extract_umbrella_data(lmp, fix, 1, 1);
-		//after[2] = lammps_extract_umbrella_data(lmp, fix, 1, 2);
-	        //if (this_local_proc == 0) {
-		//  printf("Comm %d ref: before = %f %f %f after = %f %f %f\n", i_comm, 
-		//  	bias_ref[0], bias_ref[1], bias_ref[2], after[0], after[1], after[2]);
-                //}
 #endif
 		// reset CVID
 		memcpy(my_CVID, temp_CVID, 50*sizeof(char));

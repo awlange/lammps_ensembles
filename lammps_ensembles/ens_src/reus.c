@@ -607,7 +607,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
             // Modify which bias I now have. Change it to my partner's.
             lammps_modify_umbrella_data(lmp, fix, 1, bias_partner_ref);  
             lammps_modify_umbrella_data(lmp, fix, 2, bias_partner_kappa);  
-            lammps_modify_umbrella_data(lmp, fix, 4, bias_partner_xa0);  
+            //lammps_modify_umbrella_data(lmp, fix, 4, bias_partner_xa0);  
 
 #ifdef REUS_DEBUG
             double after[3];

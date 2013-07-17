@@ -304,9 +304,12 @@ void ReadReplicaMREUS(Replica *this_replica, MPI_Comm subcomm, int split_key, in
       // Print the dimension types
       if (this_local_proc == 0) {
         printf("Comm %d Dimension types:\n", split_key);
-        printf("Comm %d Dimension %d is the REUS dimension\n", split_key, this_replica->reus_dim);
-        printf("Comm %d Dimension %d is the TEMPER dimension\n", split_key, this_replica->temp_dim);
-        printf("Comm %d Dimension %d is the RELAMBDA dimension\n", split_key, this_replica->lambda_dim);
+        if (this_replica->reus_dim >= 0) 
+          printf("Comm %d Dimension %d is the REUS dimension\n", split_key, this_replica->reus_dim);
+        if (this_replica->temp_dim >= 0) 
+          printf("Comm %d Dimension %d is the TEMPER dimension\n", split_key, this_replica->temp_dim);
+        if (this_replica->lambda_dim >= 0) 
+          printf("Comm %d Dimension %d is the RELAMBDA dimension\n", split_key, this_replica->lambda_dim);
       }
 #endif
 
