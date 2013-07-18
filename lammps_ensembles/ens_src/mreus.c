@@ -713,6 +713,13 @@ void mreus(void *lmp, MPI_Comm subcomm, int ncomms, int comm,
 
 #ifdef MREUS_DEBUG
 		double after[3];
+                if (group_swap) {
+                  after[0] = lammps_extract_umbrella_data(lmp, fix, 4, 0);
+                  after[1] = lammps_extract_umbrella_data(lmp, fix, 4, 1);
+                  after[2] = lammps_extract_umbrella_data(lmp, fix, 4, 2);
+                  printf("Replica %d xa0: before = %f %f %f after = %f %f %f\n", i_comm,
+                          bias_xa0[0], bias_xa0[1], bias_xa0[2], after[0], after[1], after[2]);
+                }
 		after[0] = lammps_extract_umbrella_data(lmp, fix, 1, 0);
 		after[1] = lammps_extract_umbrella_data(lmp, fix, 1, 1);
 		after[2] = lammps_extract_umbrella_data(lmp, fix, 1, 2);

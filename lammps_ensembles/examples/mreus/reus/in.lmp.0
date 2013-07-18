@@ -1,4 +1,4 @@
-#MREUS: evb evb, fix fes, seed 0, coordtype 0, short 0, dump 5, dump_swap 0
+#MREUS: evb evb, fix fes, seed 0, coordtype 0, short 0, dump 5, dump_swap 0, group_swap 1
 #REPLICA: id 0, ndim 1, temp 300.0
 #DIMENSION: 0 num 0 type 1 run 50 swaps 5
 #NEIGHBORS: 0 -1 1
