@@ -13,11 +13,14 @@ After so many MD steps, exchanges are attempted between replicas according to
 Boltzmann statistics probability (Metropolis criteria).
 
 LE can run: 
-   o  Parallel tempering replica exchange in one dimension
+   o  Parallel tempering replica exchange.
 
-   o  Replica exchange umbrella sampling in an arbitrary number of dimensions,
-      each dimension having a different collective variable. REUS is run
-      via the colvars library that ships with LAMMPS.
+   o  Replica exchange umbrella sampling for MS-EVB and some applications
+      with the colvars LAMMPS library. 
+
+   o  Hamiltonian exchange with off-diagonal scalar for MS-EVB.
+
+   o  Multidimensional REUS with any combination of the above.
 
    o  Dimensions which are linear or circular, thereby supporting many
       possible topologies (e.g. 3-D torus).
