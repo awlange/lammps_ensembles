@@ -36,7 +36,7 @@
  */
 
 void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int ncomms, int comm, double temp, 
-          char* fix, int seed, int coordtype, int nsteps_short, int dump, int dump_swap) {
+          char* fix, int seed, int coordtype, int nsteps_short, int dump, int dump_swap, int group_swap) {
 
 /*----------------------------------------------------------------------------------
  * MPI things
@@ -552,7 +552,10 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
 	      // lower proc does the m calculations
               V_mi = bias_v; // used from above 
               // compute bias with partner's bias
-              lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_xa0);
+              if (group_swap) 
+                lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_partner_xa0);
+              else
+                lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_xa0);
               V_mj = lammps_extract_umbrella_data(lmp, fix, -1, 0);
               if (this_proc == 0) {
                 // Recieve info from upper proc
@@ -566,7 +569,10 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
               // upper proc does the n calculations
               V_nj = bias_v; // used from above                  
               // compute bias with partner's bias
-              lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_xa0);
+              if (group_swap) 
+                lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_partner_xa0);
+              else
+                lammps_compute_bias_stuff_for_external(lmp, fix, bias_partner_kappa, bias_partner_ref, bias_xa0);
               V_ni = lammps_extract_umbrella_data(lmp, fix, -1, 0); 
               // Send info to lower proc
               buffer[0] = V_nj;
@@ -607,7 +613,7 @@ void reus(void *lmp, MPI_Comm subcomm, char* CVID, int nsteps, int nevery, int n
             // Modify which bias I now have. Change it to my partner's.
             lammps_modify_umbrella_data(lmp, fix, 1, bias_partner_ref);  
             lammps_modify_umbrella_data(lmp, fix, 2, bias_partner_kappa);  
-            //lammps_modify_umbrella_data(lmp, fix, 4, bias_partner_xa0);  
+            if (group_swap) lammps_modify_umbrella_data(lmp, fix, 4, bias_partner_xa0);  
 
 #ifdef REUS_DEBUG
             double after[3];

@@ -253,6 +253,7 @@ int main(int argc, char **argv) {
     char CVID[50];			        // Collecvtive Variable ID 
     int replicaID = -1;                         // replica ID for coordx
     int dump_swap = 0;                          // swap dump file names in temper
+    int group_swap = 0;                         // In REUS, shall we swap the group 2 coordinates in the Monte Carlo? 
     double lambda = 0.0;                        // scaling scalar
     int nsteps_short = 0;                       // short run steps for asynchronous REUS
     int coordtype = -1;                         // REUS coordinate type
@@ -373,9 +374,9 @@ int main(int argc, char **argv) {
                         int n = fscanf(infile, "#REUS:   CVID %s", CVID);
                         n += fscanf(infile, " run %d, swap %d, temp %lf, fix %s",
                                        &nsteps, &nevery, &temp, fix);
-                        n += fscanf(infile, " seed %d, coordtype %d, short %d, dump %d, dump_swap %d",
-                                       &sseed, &coordtype, &nsteps_short, &dump, &dump_swap);
-                        if (n != 10) {
+                        n += fscanf(infile, " seed %d, coordtype %d, short %d, dump %d, dump_swap %d, group_swap %d",
+                                       &sseed, &coordtype, &nsteps_short, &dump, &dump_swap, &group_swap);
+                        if (n != 11) {
                           printf("Problem reading #REUS line on subcomm %d.\n", gproc_lcomm[this_global_proc]);
                           printf("Wrong number of input fields. Please check that formatting strictly complies.\n");
                           exit(1);
@@ -386,13 +387,13 @@ int main(int argc, char **argv) {
                         CVID[len] = 0;
                         bseed = 0; // not used by REUS, we only need one seed
 		} else if(mreusflag) {
-		      int n = fscanf(infile, "#MREUS: evb %s fix %s seed %d, coordtype %d, short %d, dump %d, dump_swap %d", 
-                                     EVBfix, fix, &sseed, &coordtype, &nsteps_short, &dump, &dump_swap);
+		      int n = fscanf(infile, "#MREUS: evb %s fix %s seed %d, coordtype %d, short %d, dump %d, dump_swap %d, group_swap %d", 
+                                     EVBfix, fix, &sseed, &coordtype, &nsteps_short, &dump, &dump_swap, &group_swap);
 		      int len_fix = strlen(fix) - 1;
 		      fix[len_fix] = 0;
 		      len_fix = strlen(EVBfix) - 1;
 		      EVBfix[len_fix] = 0;
-                      if (n != 7) {
+                      if (n != 8) {
                           printf("Problem reading #MREUS line on subcomm %d.\n", gproc_lcomm[this_global_proc]);
                           printf("Wrong number of input fields. Please check that formatting strictly complies.\n");
                           exit(1);
@@ -433,6 +434,7 @@ int main(int argc, char **argv) {
     MPI_Bcast(fix, 50, MPI_CHAR, 0, subcomm);
     MPI_Bcast(EVBfix, 50, MPI_CHAR, 0, subcomm);
     MPI_Bcast(&dump_swap, 1, MPI_INT, 0, subcomm); 
+    MPI_Bcast(&group_swap, 1, MPI_INT, 0, subcomm); 
 
 	// print for error checking and bcast specific values
 	if(temperflag) {
@@ -726,7 +728,7 @@ int main(int argc, char **argv) {
     	    printf("---> Beginning MREUS...\n\n"); 
 
         if (!skip_run) {
-           mreus(lmp, subcomm, n_comms, split_key, EVBfix, fix, sseed, coordtype, nsteps_short, dump, dump_swap, &this_replica); 
+           mreus(lmp, subcomm, n_comms, split_key, EVBfix, fix, sseed, coordtype, nsteps_short, dump, dump_swap, group_swap, &this_replica); 
         }
 
         // ** Free replica array ** //
@@ -744,7 +746,7 @@ int main(int argc, char **argv) {
         if (this_global_proc == 0)
             printf("---> Beginning replica exchange umbrella sampling simulation at temperature %f \n", temp);
 
-       reus(lmp, subcomm, CVID, nsteps, nevery, n_comms, split_key, temp, fix, sseed, coordtype, nsteps_short, dump, dump_swap);
+       reus(lmp, subcomm, CVID, nsteps, nevery, n_comms, split_key, temp, fix, sseed, coordtype, nsteps_short, dump, dump_swap, group_swap);
     }
 
 /*----------------------------------------------------------------------------------
