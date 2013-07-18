@@ -1,4 +1,4 @@
-#REUS:   CVID 0, run 1000, swap 200, temp 300.0, fix fes, seed 0, coordtype 2, short 0, dump 20
+#REUS:   CVID 0, run 1000, swap 200, temp 300.0, fix fes, seed 0, coordtype 2, short 0, dump 20, dump_swap 0, group_swap 1
 
 variable        replica     string     0
 variable        output_freq string     50
