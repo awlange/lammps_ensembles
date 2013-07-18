@@ -94,7 +94,7 @@ void write_to_colvar(double, double, double, int, int);
 void write_to_colvar_init_vec(double*, double*, double*, int, char*);
 void write_to_colvar_vec(bigint, double*, double, double, int, int, char*);
 void get_umbrella_data(void*, char*, double*, double*, double*, double*, double*, double*, int);
-void mreus (void *, MPI_Comm, int, int, char *, char *, int, int, int, int, int, int, Replica *);
+void mreus (void *, MPI_Comm, int, int, char *, char *, char *, int, int, int, int, int, int, Replica *);
 
 
 
