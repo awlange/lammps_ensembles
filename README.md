@@ -2,7 +2,9 @@
 
 ## Authors 
 Adrian W. Lange
+
 Luke Westby
+
 Mladen Rasic
 
 ## Description
